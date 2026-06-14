@@ -27,6 +27,15 @@ let TOKEN = '';
 const die = (m) => { console.error('\n  ✖ ' + m + '\n'); process.exit(1); };
 const step = (m) => console.log('\n▶ ' + m);
 const run = (cmd) => execSync(cmd, { cwd: root, stdio: 'inherit' });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Tenta de novo em caso de rede instável (ECONNABORTED/timeout) — comum no upload do .exe.
+async function retry(fn, label, tries = 4) {
+  for (let i = 1; i <= tries; i++) {
+    try { return await fn(); }
+    catch (e) { console.log(`  tentativa ${i}/${tries} de "${label}" falhou: ${e.message}`); if (i < tries) await sleep(3000); }
+  }
+  die(`Não consegui completar: ${label} (rede instável). A versão já foi commitada/empacotada — tente publicar de novo mais tarde (sem novo bump de versão).`);
+}
 
 function getToken() {
   if (process.env.GH_TOKEN) return process.env.GH_TOKEN.trim();
@@ -52,8 +61,9 @@ function bump(cur, kind) {
 
 function api(method, host, p, headers, body) {
   return new Promise((res, rej) => {
-    const req = https.request({ method, host, path: p, headers: { 'User-Agent': 'RinoMask-release', Authorization: 'token ' + TOKEN, ...headers } },
+    const req = https.request({ method, host, path: p, timeout: 120000, headers: { 'User-Agent': 'RinoMask-release', Authorization: 'token ' + TOKEN, ...headers } },
       (r) => { const d = []; r.on('data', (c) => d.push(c)); r.on('end', () => res({ status: r.statusCode, body: Buffer.concat(d) })); });
+    req.on('timeout', () => req.destroy(new Error('timeout')));
     req.on('error', rej); if (body) req.write(body); req.end();
   });
 }
@@ -97,19 +107,25 @@ function api(method, host, p, headers, body) {
   for (const f of fs.readdirSync(relDir)) if (f.endsWith('.exe')) fs.rmSync(path.join(relDir, f));
   fs.copyFileSync(exe, path.join(relDir, exeName));
 
-  step('Publicando a release no GitHub e anexando o instalador');
+  step('Publicando a release no GitHub e anexando o instalador (com retry p/ rede instável)');
   const rb = JSON.stringify({ tag_name: tag, name: 'RinoMask ' + newV, draft: false, prerelease: false,
     body: `Release ${newV}.\n\nBaixe o RinoMask-Setup-${newV}.exe e execute. Não é assinado (SmartScreen: Mais informações -> Executar assim mesmo). Na 1ª abertura o app baixa o motor Camoufox (~530 MB).` });
-  const cr = await api('POST', 'api.github.com', `/repos/${OWNER}/${REPO}/releases`, { Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(rb) }, rb);
-  const rel = JSON.parse(cr.body.toString());
-  if (!rel.id) die('Falha ao criar a release: HTTP ' + cr.status + ' ' + (rel.message || ''));
+  const rel = await retry(async () => {
+    const cr = await api('POST', 'api.github.com', `/repos/${OWNER}/${REPO}/releases`, { Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(rb) }, rb);
+    const j = JSON.parse(cr.body.toString());
+    if (!j.id) throw new Error('HTTP ' + cr.status + ' ' + (j.message || ''));
+    return j;
+  }, 'criar release');
 
   const data = fs.readFileSync(exe);
   const assetName = `RinoMask-Setup-${newV}.exe`;
-  const up = await api('POST', 'uploads.github.com', `/repos/${OWNER}/${REPO}/releases/${rel.id}/assets?name=${assetName}`,
-    { 'Content-Type': 'application/octet-stream', 'Content-Length': data.length }, data);
-  const a = JSON.parse(up.body.toString());
-  if (up.status !== 201) die('Falha no upload do instalador: HTTP ' + up.status + ' ' + (a.message || ''));
+  const a = await retry(async () => {
+    const up = await api('POST', 'uploads.github.com', `/repos/${OWNER}/${REPO}/releases/${rel.id}/assets?name=${assetName}`,
+      { 'Content-Type': 'application/octet-stream', 'Content-Length': data.length }, data);
+    const j = JSON.parse(up.body.toString());
+    if (up.status !== 201) throw new Error('HTTP ' + up.status + ' ' + (j.message || ''));
+    return j;
+  }, 'upload do instalador');
 
   console.log(`\n  ✔ Release ${tag} publicada: ${rel.html_url}`);
   console.log(`  ✔ Instalador: ${a.browser_download_url}`);

@@ -49,30 +49,71 @@ const NICHES = {
 };
 const pickNiche = (n) => NICHES[String(n || '').toLowerCase()] || NICHES.default;
 
-// ---- Consentimento robusto (bounded: poucos frames/botões, sem varredura infinita) ----
+// ---- Consentimento de cookies (estratégia híbrida) ----
+// 1) caminho rápido: seletores conhecidos de alta precisão.
+// 2) heurística genérica (ideia do usuário): varre o DOM + SHADOW DOM + IFRAMES procurando o
+//    "contexto de cookie" (palavras cookie/consent/privacidade) e, dentro dele, o botão de
+//    ACEITAR (ignorando rejeitar/gerenciar/configurar). Funciona pra banners que aparecem em
+//    qualquer lugar, sobrepostos ao conteúdo. Não depende de rolagem.
 const CONSENT_SELECTORS = [
   '#onetrust-accept-btn-handler', 'button#L2AGLb', '#bnp_btn_accept',
   '.fc-cta-consent', '#accept-choices', '[data-testid="accept-button"]',
   'button[aria-label*="Accept" i]', 'button[aria-label*="Aceitar" i]', 'button[mode="primary"]',
   '#didomi-notice-agree-button', 'tp-yt-paper-button[aria-label*="Aceitar" i]',
 ];
-const ACCEPT_TEXT = /^(aceitar tudo|aceitar todos|aceitar e fechar|aceitar|aceito|concordo|prosseguir|entendi|ok,? entendi|allow all|accept all|accept|i agree|agree|got it|allow|continuar|sim, aceito)$/i;
+
+// Executado DENTRO de cada frame: encontra e clica no botão de aceitar cookies. Retorna o texto clicado (ou null).
+/* eslint-disable */
+function dismissConsentInFrame() {
+  var STRONG = /(aceit|accept|concordo|i agree|\bagree\b|allow all|accept all|permitir todos|allow|permitir|consinto|consent all)/i;
+  var WEAK   = /(\bok\b|\bsim\b|entendi|got it|prosseguir|continuar|fechar|tudo bem|understood)/i;
+  var REJECT = /(rejeit|recus|reject|decline|negar|gerenciar|configurar|personalizar|customize|manage|settings|prefer|op[cç][õo]es|mais op|saiba mais|learn more|only necessary|apenas (necess|essenc)|essenciais|necess[aá]rios|n[aã]o aceit|withdraw)/i;
+  var COOKIE = /(cookie|consent|consentimento|privac|gdpr|lgpd|prote[cç][aã]o de dados|prefer[eê]ncias|rastre)/i;
+  var els = [];
+  function walk(root) {
+    try {
+      var list = root.querySelectorAll('button, a, [role="button"], input[type="button"], input[type="submit"], [onclick], tp-yt-paper-button, [class*="accept" i], [id*="accept" i], [class*="agree" i], [class*="consent" i]');
+      for (var i = 0; i < list.length; i++) els.push(list[i]);
+      var all = root.querySelectorAll('*');
+      for (var j = 0; j < all.length; j++) if (all[j].shadowRoot) walk(all[j].shadowRoot); // shadow DOM aberto
+    } catch (e) {}
+  }
+  walk(document);
+  function vis(el) { try { var r = el.getBoundingClientRect(); var s = getComputedStyle(el); return r.width > 4 && r.height > 4 && s.visibility !== 'hidden' && s.display !== 'none' && parseFloat(s.opacity || '1') > 0.1; } catch (e) { return false; } }
+  function txt(el) { return ((el.innerText || el.textContent || (el.getAttribute && el.getAttribute('aria-label')) || el.value || '') + '').replace(/\s+/g, ' ').trim(); }
+  function inCookieCtx(el) { var n = el, h = 0; while (n && h < 9) { var t = txt(n) + ' ' + (n.id || '') + ' ' + (n.className || ''); if (COOKIE.test(t)) return true; n = n.parentElement || (n.getRootNode && n.getRootNode().host); h++; } return false; }
+  var best = null, bestScore = 0;
+  for (var k = 0; k < els.length; k++) {
+    var el = els[k]; if (!vis(el)) continue;
+    var t = txt(el); if (t.length > 60) continue;
+    if (REJECT.test(t)) continue;                 // nunca rejeitar/gerenciar
+    var ctx = inCookieCtx(el);
+    var idc = ((el.id || '') + ' ' + (el.className || '')).toLowerCase();
+    var score = 0;
+    if (STRONG.test(t)) score += 5;
+    else if (WEAK.test(t) && ctx) score += 2;     // "OK/Sim" só conta dentro de banner de cookie
+    if (/accept|agree|consent|allow|aceit|concord/.test(idc)) score += 3;
+    if (ctx) score += 4;
+    if (score >= 5) { if (score > bestScore) { bestScore = score; best = el; } }
+  }
+  if (best) { try { best.scrollIntoView({ block: 'center' }); } catch (e) {} try { best.click(); } catch (e) {} return txt(best).slice(0, 50); }
+  return null;
+}
+/* eslint-enable */
 
 async function acceptConsent(page) {
-  await sleep(rand(800, 1600));
-  const frames = page.frames().slice(0, 5); // no máx. 5 frames
-  for (const fr of frames) {
-    for (const sel of CONSENT_SELECTORS) {
-      try { if (await fr.locator(sel).count()) { if (await clickMaybe(fr, fr.locator(sel), 2500)) { await sleep(600); return true; } } } catch (e) {}
-    }
-    try {
-      const btns = fr.getByRole('button');
-      const n = Math.min(await btns.count().catch(() => 0), 18); // no máx. 18 botões
-      for (let i = 0; i < n; i++) {
-        const t = (await btns.nth(i).innerText({ timeout: 1500 }).catch(() => '')).trim();
-        if (t && ACCEPT_TEXT.test(t)) { await btns.nth(i).click({ timeout: 2500 }).catch(() => {}); await sleep(600); return true; }
+  for (let round = 0; round < 3; round++) {
+    await sleep(rand(700, 1300));
+    // 1) caminho rápido (clique confiável via Playwright) em cada frame
+    for (const fr of page.frames().slice(0, 6)) {
+      for (const sel of CONSENT_SELECTORS) {
+        try { if (await fr.locator(sel).count()) { if (await clickMaybe(fr, fr.locator(sel), 2500)) { await sleep(700); return true; } } } catch (e) {}
       }
-    } catch (e) {}
+    }
+    // 2) heurística genérica (DOM + shadow + iframes) por frame
+    for (const fr of page.frames().slice(0, 6)) {
+      try { const hit = await fr.evaluate(dismissConsentInFrame); if (hit) { await sleep(800); return true; } } catch (e) {}
+    }
   }
   return false;
 }
@@ -217,4 +258,4 @@ async function warmUp(page, { tasks, niche, onProgress, budgetMs } = {}) {
   return { visited, total: plan.length };
 }
 
-module.exports = { warmUp, TASKS, buildJourney, measureWarmth };
+module.exports = { warmUp, TASKS, buildJourney, measureWarmth, acceptConsent };
