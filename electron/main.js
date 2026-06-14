@@ -9,6 +9,7 @@ const proxyMgr = require('../src/proxyManager');
 const sync = require('../src/synchronizer');
 const cookieRobot = require('../src/cookieRobot');
 const trustScore = require('../src/trustScore');
+const detect = require('../src/detect');
 const errorLog = require('../src/errorLog');
 const branding = require('../src/branding');
 const updateChecker = require('../src/updateChecker');
@@ -90,6 +91,35 @@ async function warmProfile(id) {
     emit('warm:done', { id, error: e && e.message });
   } finally {
     if (launchedByRobot) await launcher.stop(id).catch(() => {}); // fecha a janela ao concluir
+    notifyChanged();
+  }
+}
+
+// Auditoria de detecção: abre o perfil, roda a bateria local + os oráculos externos
+// (CreepJS/BrowserScan/Iphey), guarda o relatório e fecha. Visível no app (mais honesto:
+// detectores degradam em headless); headless só em testes.
+async function auditProfile(id, oracles) {
+  const prof = store.getProfile(id);
+  if (!prof) { emit('detect:done', { id, error: 'perfil não encontrado' }); return; }
+  const wasRunning = launcher.isRunning(id);
+  if (wasRunning && launcher.kindOf(id) !== 'pw') { emit('detect:done', { id, error: 'feche o navegador (modo manual) antes de auditar' }); return; }
+  let launched = false;
+  try {
+    if (!wasRunning) {
+      await launcher.launchAutomation(prof, { headless: process.env.RINOMASK_HEADLESS === '1' });
+      launched = true; store.markLaunched(id); notifyChanged();
+    }
+    const page = launcher.getPage(id);
+    if (!page) { emit('detect:done', { id, error: 'sem página disponível' }); return; }
+    emit('detect:start', { id });
+    const report = await detect.audit(page, { oracles: oracles || ['browserscan', 'iphey', 'creepjs'], onProgress: (s) => emit('detect:progress', { id, ...s }) });
+    store.setDetectReport(id, report);
+    emit('detect:done', { id, overall: report.overall, report });
+  } catch (e) {
+    errorLog.log({ source: 'detect', message: e && e.message, stack: e && e.stack, context: { id } });
+    emit('detect:done', { id, error: e && e.message });
+  } finally {
+    if (launched) await launcher.stop(id).catch(() => {});
     notifyChanged();
   }
 }
@@ -226,6 +256,9 @@ const handlers = {
     notifyChanged();
     return { ok: true, ...r };
   },
+
+  // --- auditoria de detecção (bateria local + oráculos externos) ---
+  'detect.run': (p) => { auditProfile(p.id, p && p.oracles); return { started: true }; },
 
   // --- synchronizer ---
   'sync.start': (p) => sync.start(p.ids),

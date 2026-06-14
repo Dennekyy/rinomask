@@ -263,6 +263,12 @@ function setWarmth(id, data) {
   if (p) { p.warmth = data; save(); }
 }
 
+// Guarda a última auditoria de detecção (bateria local + oráculos externos).
+function setDetectReport(id, data) {
+  const p = db.profiles.find((x) => x.id === id);
+  if (p) { p.detect = data; save(); }
+}
+
 // Persiste a fingerprint estável (BrowserForge + WebGL/seeds) gerada na 1a abertura.
 function setFingerprintData(id, data) {
   const p = db.profiles.find((x) => x.id === id);
@@ -479,7 +485,7 @@ function saveSettings(patch) { Object.assign(db.settings, patch); save(); }
 
 module.exports = {
   setDataDir, userDataDir,
-  listProfiles, getProfile, createProfile, updateProfile, markLaunched, setFingerprintData, setTrustScore, setWarmth,
+  listProfiles, getProfile, createProfile, updateProfile, markLaunched, setFingerprintData, setTrustScore, setWarmth, setDetectReport,
   cloneProfile, bulkSetStatus, bulkAddTag, bulkRemoveTag, bulkSetFolder, bulkSetProxy,
   trashProfiles, restoreProfiles, deleteProfilesForever, resolveProxy,
   listProxies, createProxy, updateProxyMeta, deleteProxy, importProxiesBulk,

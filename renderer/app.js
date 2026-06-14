@@ -348,6 +348,7 @@ function openRowMenu(e, p) {
   ctx.append(it('cookie', 'Cookies…', () => openCookiesModal(p)));
   ctx.append(it('flame', 'Aquecer (Cookie Robot)', () => { inv('cookieRobot.run', { id: p.id }); toast('Aquecimento iniciado…'); }));
   ctx.append(it('shield', 'Testar fingerprint (trust score)', () => runTrust(p)));
+  ctx.append(it('alert', 'Auditoria de detecção (oráculos)', () => { inv('detect.run', { id: p.id }); toast('🔎 Auditoria iniciada (abre o navegador, ~1-3 min)…'); }));
   ctx.append(it('pin', p.pinned ? 'Desafixar' : 'Fixar no topo', async () => { await inv('profiles.pin', { id: p.id, pinned: !p.pinned }); }));
   ctx.append(el('div', { class: 'sep' }));
   ctx.append(it('trash', 'Excluir', async () => { await inv('profiles.trash', { ids: [p.id] }); toast('Movido para a lixeira'); }, 'danger'));
@@ -500,6 +501,33 @@ async function runTrust(p) {
       foot: [el('button', { class: 'ghost', onClick: closeModal }, 'Fechar')],
     });
   } catch (e) { toast('Erro: ' + e.message); }
+}
+
+// Relatório da auditoria de detecção (bateria local + oráculos externos).
+function openDetectReport(rep) {
+  const coh = rep.coherence || { score: 0, checks: [], lies: [] };
+  const oracleRows = (rep.oracles || []).map((o) => el('div', { class: 'list-row' },
+    el('span', { style: 'font-size:15px' }, o.ok ? '🌐' : '⚪'),
+    el('span', { class: 'grow' }, o.name + (o.verdict ? ' — ' + o.verdict : (o.ok ? '' : ' (indisponível)'))),
+    typeof o.score === 'number' ? el('span', { style: `font-weight:700;color:${trustColor(o.score)}` }, o.score + '/100') : null));
+  const failing = coh.checks.filter((c) => !c.ok);
+  const cohRows = (failing.length ? failing : coh.checks.slice(0, 0)).map((c) => el('div', { class: 'list-row' },
+    el('span', {}, c.lie ? '❌' : '⚠️'),
+    el('span', { class: 'grow' }, c.name),
+    c.detail ? el('span', { class: 'hint mono', style: 'max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, c.detail) : null));
+  modal({
+    title: 'Auditoria de detecção', wide: true,
+    body: [
+      el('div', { style: `font-size:34px;font-weight:800;text-align:center;color:${trustColor(rep.overall)}` }, `${rep.overall}/100`),
+      el('p', { class: 'hint', style: 'text-align:center;margin-top:0' }, 'Nota geral = a PIOR entre a bateria local e os detectores externos.'),
+      el('fieldset', {}, el('legend', {}, `Bateria local (coerência) — ${coh.score}/100 · ${coh.lies.length ? coh.lies.length + ' mentira(s)' : 'sem mentiras'}`),
+        ...(failing.length ? cohRows : [el('p', { class: 'hint' }, 'Nenhuma contradição encontrada nos vetores locais. ✅')])),
+      el('fieldset', {}, el('legend', {}, 'Detectores externos (oráculos)'),
+        ...(oracleRows.length ? oracleRows : [el('p', { class: 'hint' }, 'Nenhum oráculo retornou.')]),
+        el('p', { class: 'hint' }, 'Os detectores podem degradar em modo automático; rode com o perfil visível para o resultado mais fiel.')),
+    ],
+    foot: [el('button', { class: 'ghost', onClick: closeModal }, 'Fechar')],
+  });
 }
 
 /* ============================== Motor (1ª execução) ============================== */
@@ -819,6 +847,9 @@ window.api.onEvent((e) => {
   if (e.type === 'warm:start') toast('🍪 Aquecendo perfil…');
   else if (e.type === 'warm:progress') toast(`Aquecendo (${(e.index || 0) + 1}/${e.total})…`);
   else if (e.type === 'warm:done') toast(e.error ? ('Aquecimento: ' + e.error) : `✓ Aquecimento concluído${e.visited ? ' — ' + e.visited + ' etapas' : ''}${typeof e.warmth === 'number' ? ' · maturidade ' + e.warmth + '/100' : ''}`);
+  else if (e.type === 'detect:start') toast('🔎 Auditando detecção…');
+  else if (e.type === 'detect:progress') toast(e.oracle ? `Consultando ${e.oracle}…` : 'Analisando coerência local…');
+  else if (e.type === 'detect:done') { if (e.error) toast('Auditoria: ' + e.error); else { toast(`✓ Auditoria concluída — nota geral ${e.overall}/100`); if (e.report) openDetectReport(e.report); } }
   else if (e.type === 'engine:progress') { const ov = $('#engine'); if (ov && ov._status) ov._status.textContent = e.line || 'baixando…'; }
   else if (e.type === 'engine:done') {
     const ov = $('#engine');
