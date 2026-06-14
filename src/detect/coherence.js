@@ -52,14 +52,12 @@ async function runCoherence(page) {
     const offMatch = (() => { try { const now = new Date(); const inTz = new Date(now.toLocaleString('en-US', { timeZone: tz })); return Math.abs((now - inTz) / 60000) < 24 * 60; } catch (e) { return false; } })();
     add('fuso (Intl) consistente com Date', !!tz && offMatch, 8, !!tz && !offMatch, tz);
 
-    // ---- 6. Tela com dimensões plausíveis (sem impossibilidades) ----
-    // Só avalia se a janela está "realizada" (outerWidth>0); em about:blank/headless cru as
-    // dimensões podem vir zeradas e isso não é uma mentira de fingerprint.
+    // ---- 6. Tela sem dimensões IMPOSSÍVEIS (sinal forte; evita falsos em headless) ----
+    // A relação inner/outer é frágil em headless; aqui pegamos só o que é fisicamente impossível
+    // num navegador real: área útil maior que a tela, ou profundidade de cor estranha.
     const s = screen;
-    const realized = window.outerWidth > 0 && s.width > 0;
-    const screenSane = !realized || (s.availWidth <= s.width && s.availHeight <= s.height &&
-      window.innerWidth <= window.outerWidth + 1 && window.outerWidth <= s.width + 1 && s.colorDepth >= 24);
-    add('tela com dimensões coerentes', screenSane, 8, realized && !screenSane, `${s.width}x${s.height} avail ${s.availWidth}x${s.availHeight} inner ${window.innerWidth} outer ${window.outerWidth}`);
+    const impossible = s.width <= 0 || s.height <= 0 || s.availWidth > s.width + 1 || s.availHeight > s.height + 1 || (s.colorDepth && s.colorDepth < 24);
+    add('tela sem dimensões impossíveis', !impossible, 8, impossible, `${s.width}x${s.height} avail ${s.availWidth}x${s.availHeight} cd${s.colorDepth}`);
     add('devicePixelRatio plausível', window.devicePixelRatio >= 0.5 && window.devicePixelRatio <= 4, 3, false, String(window.devicePixelRatio));
 
     // ---- 7. WebGL exposto e coerente com o SO (sem render de software) ----

@@ -1,13 +1,13 @@
 # RinoMask — MANIFEST.sha256 (impressão digital do código-fonte)
 # Titular: Dennekyy (https://github.com/Dennekyy)
-# Gerado em: 2026-06-14T05:36:04.130Z
+# Gerado em: 2026-06-14T05:43:11.748Z
 # Arquivos: 54
-# HASH-RAIZ (SHA-256 de todos): 68dbc636c7a548d7f04de8dde2d6bc0df8ec7e92afb86a3fccfd87b6f7bb8997
+# HASH-RAIZ (SHA-256 de todos): f2ab00b4ea79c4893f82ca6db7945de2427b34a369e470a1337a91401d22e656
 #
 9dd4668799a7db0f617fdb60430b155f102e0ace41736d85fc75a2e9ee8df0e3  .gitignore
 77448d1ba19f472758bf016ad7ef48d77cc1655db4af5811e86cd3b2291ff7fb  AUTHORSHIP.md
 40435d9a238020f1359df8b8cb0b83c3b72b7a1d3a7e0af6fd1250b1920d2908  build/icon.ico
-ae9d36aae5cfaf4dba44d0ddde91b90bc96d31c412eb197cdf0e24da8a83141c  electron/main.js
+48885a6fd4183881d67eac5e143eab34012ffa30e0a185ade6a88122c366a9c3  electron/main.js
 68906a0096da5e4c0cc48902b139948b18bbdab5245310e30f10fa4dcfbd5979  electron/preload.js
 ec452563de2ee95b0af664194581510e3b32262a5ba00cfcb557184309a3e8c0  LICENSE
 bf2f4bc8a57ddd28b8de51637ec93eedca0f478bd44deba1b89d8d1d1e43ff37  package.json
@@ -26,7 +26,7 @@ b49ae34aeec71a892327dc6d203365c613d88d274f4a4da6fcd99447923123fa  scripts/make-i
 6e8d50bad994280e15847a78c7d72e456e462dc0be22c8689ad0eedabf65e596  scripts/test-advanced.js
 7be4a574a3804bcd8824331734578fa8dfcb37ff10b9f5e0b58f37b55dd1949d  scripts/test-bridge.js
 84d2fb6ff38b2f256f96b7ad57e250da26e7729e0f24edcbbee1d11667f8c3b7  scripts/test-camoufox.js
-01e43d52119314c7691734c1f12fee8caa2ec6b9d304b0d87a0a506417700dc6  scripts/test-detect.js
+8cc466cb9cbc0694967c0619e06ff81681b31868378cb9f27959e42084253c9a  scripts/test-detect.js
 3c645f03db142cfe365759598d95bc0424b866881b2bb708d230fa6c28e8b820  scripts/test-isolation.js
 e65616ef25fc40acefe9687b8fd5f1a31aa16dec5ef42bf665db6c250522d61b  scripts/test-launch.js
 d8c913e4c7a3b05b9d3ec65945ab89f14752f17a356df7f886f8140e44e1e94b  scripts/test-manual.js
@@ -43,9 +43,9 @@ da0c5324658d78d775cd9410fa6b37f8f3189ebf523c0899351adbf5e2ab29a6  scripts/trace-
 33f44fb1d75508a71fd4f89ee6cee9db7d3f5285b25a24869e46832038127929  src/branding.js
 6771aca3e4c15057d7b4136d62c178ce43970e25780c440f940f3c6bdef8c783  src/browserLauncher.js
 ebdd4a3e524322d9d679a10cf1c259c77f7c72ff6fd3a470ba1f4d0117f7a9a8  src/cookieRobot.js
-c4693eb9c7b9a687d707454f44ad7efbd6d964abb729ee45cd76933768b9b7b9  src/detect/coherence.js
-6754290bb33f67ad5bd70b84c54354b8c690dd7b76cbfa81297113541e13f65d  src/detect/index.js
-555dc4fcf0fbdc22beeab4d7e61885205c270ae90e0b7ca808108c480de56872  src/detect/oracles.js
+b2e8d37d5d979bde249950bc7aff6038e82bece61781ecf1dbeb10712b8dea61  src/detect/coherence.js
+89d71753f93da9ea8197fc747b727ed6db14f12703285825a21448d730fe4398  src/detect/index.js
+f85e28eedbe651fd4f7dfcfb53247991b88093133f621a15c779b729cc95675b  src/detect/oracles.js
 e977dcc7d1c3c75e3e00b0c9ab8c898b50abc4babe43034650e8ba88cb719893  src/engines/camoufox.js
 3ed35d85d38f35c8e1778cfcc2d4691b37f9470efe980c35290aadfe6ee03fa6  src/errorLog.js
 cc81c987d7e1bfa5decd833bf4d56fc2d12b1396ab3ac2f83c58879a74310f10  src/fingerprint.js

@@ -112,7 +112,7 @@ async function auditProfile(id, oracles) {
     const page = launcher.getPage(id);
     if (!page) { emit('detect:done', { id, error: 'sem página disponível' }); return; }
     emit('detect:start', { id });
-    const report = await detect.audit(page, { oracles: oracles || ['browserscan', 'iphey', 'creepjs'], onProgress: (s) => emit('detect:progress', { id, ...s }) });
+    const report = await detect.audit(page, { oracles: oracles || ['leaks', 'browserscan', 'iphey', 'creepjs'], onProgress: (s) => emit('detect:progress', { id, ...s }) });
     store.setDetectReport(id, report);
     emit('detect:done', { id, overall: report.overall, report });
   } catch (e) {

@@ -9,6 +9,8 @@ const { ORACLES } = require('./oracles');
 
 async function audit(page, { oracles = ['creepjs'], onProgress } = {}) {
   if (onProgress) onProgress({ stage: 'coherence' });
+  // A bateria local precisa de uma página real (about:blank dá dimensões de janela degeneradas).
+  try { const u = page.url(); if (!u || u.startsWith('about:')) await page.goto('https://example.com/', { waitUntil: 'domcontentloaded', timeout: 30000 }); } catch (e) {}
   const coherence = await runCoherence(page);
 
   const results = [];

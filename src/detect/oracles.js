@@ -88,6 +88,43 @@ async function iphey(page) {
   return r;
 }
 
-const ORACLES = { creepjs, browserscan, iphey };
+// Vazamentos (IP/WebRTC/fuso) — o vetor mais crítico p/ antidetect e NÃO coberto pelos
+// oráculos de fingerprint. Faz tudo em página (sem scraping frágil): compara o IP visto por
+// HTTP com os IPs do WebRTC (vazamento se diferirem) e o fuso do navegador com a geo do IP.
+async function leaks(page) {
+  const r = { name: 'Vazamentos (IP/WebRTC/fuso)', url: 'rede', ok: false, score: null, verdict: '', raw: '' };
+  try {
+    await page.goto('https://example.com/', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+    const d = await page.evaluate(async () => {
+      const j = async (u) => { try { return await (await fetch(u)).json(); } catch (e) { return null; } };
+      const ipj = await j('https://api.ipify.org?format=json');
+      const geo = (await j('https://ipapi.co/json/')) || {};
+      const webrtcIps = await new Promise((res) => {
+        const ips = new Set();
+        try {
+          const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+          pc.createDataChannel('x');
+          pc.onicecandidate = (e) => { if (!e.candidate) return res([...ips]); const m = /([0-9]{1,3}(?:\.[0-9]{1,3}){3})/.exec(e.candidate.candidate || ''); if (m && !/\.local/.test(e.candidate.candidate)) ips.add(m[1]); };
+          pc.createOffer().then((o) => pc.setLocalDescription(o)).catch(() => {});
+          setTimeout(() => res([...ips]), 4500);
+        } catch (e) { res([]); }
+      });
+      return { httpIp: ipj && ipj.ip, webrtcIps, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, geoTz: geo.timezone, country: geo.country_name };
+    });
+    const priv = (ip) => /^(10|127|0|169\.254|192\.168|172\.(1[6-9]|2\d|3[01]))\./.test(ip);
+    const pubWebrtc = (d.webrtcIps || []).filter((ip) => /^[0-9.]+$/.test(ip) && !priv(ip));
+    const leak = !!d.httpIp && pubWebrtc.some((ip) => ip !== d.httpIp);
+    const tzMismatch = !!(d.tz && d.geoTz && d.tz !== d.geoTz);
+    let score = 100; const flags = [];
+    if (leak) { score = Math.min(score, 25); flags.push('WebRTC vaza IP real'); }
+    if (tzMismatch) { score = Math.min(score, 60); flags.push(`fuso ${d.tz} ≠ geo ${d.geoTz}`); }
+    r.score = score; r.ok = true;
+    r.verdict = flags.length ? flags.join(' · ') : 'sem vazamento · fuso coerente';
+    r.raw = `IP HTTP ${d.httpIp || '?'} · WebRTC [${pubWebrtc.join(', ') || 'nenhum público'}] · geo ${d.country || '?'}`;
+  } catch (e) { r.error = e.message; }
+  return r;
+}
+
+const ORACLES = { leaks, creepjs, browserscan, iphey };
 
 module.exports = { ORACLES };

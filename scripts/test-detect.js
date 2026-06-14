@@ -9,7 +9,7 @@ const launcher = require('../src/browserLauncher');
 const detect = require('../src/detect');
 
 const THRESHOLD = Number(process.env.DETECT_MIN || 70);
-const ORACLES = (process.env.DETECT_ORACLES || 'creepjs,iphey,browserscan').split(',').map((s) => s.trim()).filter(Boolean);
+const ORACLES = (process.env.DETECT_ORACLES || 'leaks,iphey,browserscan,creepjs').split(',').map((s) => s.trim()).filter(Boolean);
 
 (async function main() {
   const tmp = path.join(os.tmpdir(), 'rinomask-detect-' + Date.now());
