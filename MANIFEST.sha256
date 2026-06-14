@@ -1,13 +1,13 @@
 # RinoMask — MANIFEST.sha256 (impressão digital do código-fonte)
 # Titular: Dennekyy (https://github.com/Dennekyy)
-# Gerado em: 2026-06-14T06:19:20.017Z
+# Gerado em: 2026-06-14T20:59:57.543Z
 # Arquivos: 54
-# HASH-RAIZ (SHA-256 de todos): c76121788dd22327dcd271a8b2e5804424dc2dcbb2772e2230cb25224c437938
+# HASH-RAIZ (SHA-256 de todos): b88ae5733c622771e2ede20a520e8cd489a6b752fe0914f8995eddf61fc99258
 #
 55b431fcf2ba7813a772553d87d4fe1ee6d7489ea9d7d6a587f5e672473df3fe  .gitignore
 77448d1ba19f472758bf016ad7ef48d77cc1655db4af5811e86cd3b2291ff7fb  AUTHORSHIP.md
 40435d9a238020f1359df8b8cb0b83c3b72b7a1d3a7e0af6fd1250b1920d2908  build/icon.ico
-187b6522e7d27185c0f36db8b3f3d395633fa549df093607909ed63747009fca  electron/main.js
+f616a84cd1147ee9ae784bfd567cac2f1ff6dd1687c68ff0ea068ff9422f0b0f  electron/main.js
 68906a0096da5e4c0cc48902b139948b18bbdab5245310e30f10fa4dcfbd5979  electron/preload.js
 ec452563de2ee95b0af664194581510e3b32262a5ba00cfcb557184309a3e8c0  LICENSE
 f7674822a541eb45e45df04ae1eb8cd1f3de558d5923b06fb5e9ffa13fde9b0c  package.json
@@ -38,11 +38,11 @@ d8c913e4c7a3b05b9d3ec65945ab89f14752f17a356df7f886f8140e44e1e94b  scripts/test-m
 e137f22e335f254c981688ebcaf6b2f4416c5ea802905a9b6612e515c551fcff  scripts/test-ui-vault.js
 8e1a8c95933b84bcbd1d6c5238611281246ad59dac8bf14857f500e7d3a0073a  scripts/test-ui.js
 695f738d804c62a4dc1efa63a76507e11d5cbae1317611a4f9e4f4af7eb11075  scripts/test-vault.js
-e242c0768a91f14b85e50de7c26061f0f67b51ffd35ca80c46d974880e287c5c  scripts/test-warm.js
+928b9137099a6f71776551d15203ef3bd1b518af50ce1bf5d2e85b50e0debd12  scripts/test-warm.js
 ccfbe0d444d8ce6e2caeb6042a5caa6482e99e0b24e12b462ef840cb4ac3a5e1  scripts/test-window.js
 33f44fb1d75508a71fd4f89ee6cee9db7d3f5285b25a24869e46832038127929  src/branding.js
 6771aca3e4c15057d7b4136d62c178ce43970e25780c440f940f3c6bdef8c783  src/browserLauncher.js
-ebdd4a3e524322d9d679a10cf1c259c77f7c72ff6fd3a470ba1f4d0117f7a9a8  src/cookieRobot.js
+1a84cbd4ef40438e290af9a2b390948e458cd81db60f65d9826155eaf9ed1b52  src/cookieRobot.js
 b2e8d37d5d979bde249950bc7aff6038e82bece61781ecf1dbeb10712b8dea61  src/detect/coherence.js
 89d71753f93da9ea8197fc747b727ed6db14f12703285825a21448d730fe4398  src/detect/index.js
 f85e28eedbe651fd4f7dfcfb53247991b88093133f621a15c779b729cc95675b  src/detect/oracles.js

@@ -72,17 +72,22 @@ async function warmProfile(id) {
   const wasRunning = launcher.isRunning(id);
   if (wasRunning && launcher.kindOf(id) !== 'pw') { emit('warm:done', { id, error: 'feche o navegador (modo manual) antes de aquecer' }); return; }
   let launchedByRobot = false;
+  const BUDGET = 4 * 60 * 1000;
+  // Trava de segurança: fecha o navegador no pior caso, mesmo se algo travar além do teto interno.
+  let killer = null;
   try {
     if (!wasRunning) {
       await launcher.launchAutomation(prof, { headless: process.env.RINOMASK_HEADLESS === '1' });
       launchedByRobot = true;
       store.markLaunched(id);
       notifyChanged();
+      killer = setTimeout(() => { launcher.stop(id).catch(() => {}); }, BUDGET + 120000);
     }
     const page = await launcher.getPage(id);
     if (!page) { emit('warm:done', { id, error: 'sem página disponível' }); return; }
     emit('warm:start', { id });
-    const r = await cookieRobot.warmUp(page, { onProgress: (pr) => emit('warm:progress', { id, ...pr }) });
+    // Jornada começo→meio→fim direcionada ao nicho do perfil; SEMPRE termina dentro do teto.
+    const r = await cookieRobot.warmUp(page, { niche: prof.mainWebsite, budgetMs: BUDGET, onProgress: (pr) => emit('warm:progress', { id, ...pr }) });
     const w = await cookieRobot.measureWarmth(page.context(), r.visited);
     store.setWarmth(id, { ...w, at: new Date().toISOString() });
     emit('warm:done', { id, visited: r.visited, warmth: w.score });
@@ -90,6 +95,7 @@ async function warmProfile(id) {
     errorLog.log({ source: 'cookieRobot', message: e && e.message, stack: e && e.stack, context: { id } });
     emit('warm:done', { id, error: e && e.message });
   } finally {
+    if (killer) clearTimeout(killer);
     if (launchedByRobot) await launcher.stop(id).catch(() => {}); // fecha a janela ao concluir
     notifyChanged();
   }
