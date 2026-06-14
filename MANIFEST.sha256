@@ -1,16 +1,16 @@
 # RinoMask — MANIFEST.sha256 (impressão digital do código-fonte)
 # Titular: Dennekyy (https://github.com/Dennekyy)
-# Gerado em: 2026-06-14T06:03:32.568Z
-# Arquivos: 53
-# HASH-RAIZ (SHA-256 de todos): d92ecfe87eed490c5af4762a9d9a13eeeda8f90f843b4565a09b68ab7977349b
+# Gerado em: 2026-06-14T06:19:20.017Z
+# Arquivos: 54
+# HASH-RAIZ (SHA-256 de todos): c76121788dd22327dcd271a8b2e5804424dc2dcbb2772e2230cb25224c437938
 #
-9dd4668799a7db0f617fdb60430b155f102e0ace41736d85fc75a2e9ee8df0e3  .gitignore
+55b431fcf2ba7813a772553d87d4fe1ee6d7489ea9d7d6a587f5e672473df3fe  .gitignore
 77448d1ba19f472758bf016ad7ef48d77cc1655db4af5811e86cd3b2291ff7fb  AUTHORSHIP.md
 40435d9a238020f1359df8b8cb0b83c3b72b7a1d3a7e0af6fd1250b1920d2908  build/icon.ico
 187b6522e7d27185c0f36db8b3f3d395633fa549df093607909ed63747009fca  electron/main.js
 68906a0096da5e4c0cc48902b139948b18bbdab5245310e30f10fa4dcfbd5979  electron/preload.js
 ec452563de2ee95b0af664194581510e3b32262a5ba00cfcb557184309a3e8c0  LICENSE
-9eb81e4aa97753b239f648ce05ba71fd3d927dd7398d0956247bee2737a01c2d  package.json
+f7674822a541eb45e45df04ae1eb8cd1f3de558d5923b06fb5e9ffa13fde9b0c  package.json
 1dabee739ef7785a8ad51c664ed7c2a80782fed9282b8abfac68d68c408f9700  README.md
 8e972be75622499a046513f076875f69de3a0c8e196385dd39369671024a4fe8  renderer/app.js
 cba04a421e7fd5ebb875ee595469ef4d3b2ebdbc81fe062e06bbc7d249c0a9ee  renderer/index.html
@@ -21,6 +21,7 @@ cba04a421e7fd5ebb875ee595469ef4d3b2ebdbc81fe062e06bbc7d249c0a9ee  renderer/index
 7172b4019fc7d6217938304c947cfe8c9dfabb7e0c219000632ed38f0b53adcc  scripts/fetch-rcedit.js
 cf05b9db2d48a3929b214f9ddf09d9786b2de3a9ba041160992b5215a54a9de1  scripts/make-icon.js
 150198df642e2edeb74b2e2a0d131713ba9b8f17c4930748bdfcd01654c98382  scripts/make-manifest.js
+4babe5fb1b041df8a97de92bd2029b5b3d6bce0ce99797d91c034d2665f12e2a  scripts/release.js
 63a21e65e9520ffdeedff6bad83365c1bb5fe7c25e45aefa40a47916c307ba03  scripts/screenshot.js
 1ff5ff236cab9eb204367a9bec4054e558266f3c1977f9595f0d94fceee220e1  scripts/setup-electron.js
 6e8d50bad994280e15847a78c7d72e456e462dc0be22c8689ad0eedabf65e596  scripts/test-advanced.js

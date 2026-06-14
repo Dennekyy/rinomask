@@ -22,3 +22,6 @@ preview-*.png
 Thumbs.db
 .DS_Store
 .vscode/
+
+# Token de release (NUNCA versionar)
+.rinomask-release-token
