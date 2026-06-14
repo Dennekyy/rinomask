@@ -51,8 +51,8 @@ const ICONS = {
 };
 const trustColor = (s) => (s >= 85 ? 'var(--green)' : s >= 60 ? 'var(--amber)' : 'var(--red)');
 
-// Logo RinoMask (imagem) para a tela de bloqueio.
-const RHINO_SVG = '<img src="logo.png" alt="RinoMask" />';
+// Logo RinoMask (SVG vetorizado, recolorível) para a tela de bloqueio.
+const RHINO_SVG = '<span class="logo-mark"></span>';
 function svg(name, size = 16) {
   const NS = 'http://www.w3.org/2000/svg';
   const s = document.createElementNS(NS, 'svg');
