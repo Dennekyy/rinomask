@@ -254,7 +254,7 @@ function renderTable() {
       box.append(el('button', { class: 'sm danger', title: 'Excluir definitivamente', onClick: () => confirmDeleteForever([p.id]) }, svg('trash', 14)));
     } else {
       if (p.running) box.append(el('button', { class: 'sm', onClick: async () => { await inv('profiles.stop', { id: p.id }); } }, svg('stop', 13), 'Parar'));
-      else box.append(el('button', { class: 'sm primary', onClick: async () => { toast('Abrindo…'); try { await inv('profiles.launch', { id: p.id }); } catch (e) { toast('Erro: ' + e.message); } } }, svg('play', 13), 'Abrir'));
+      else box.append(el('button', { class: 'sm open', onClick: async () => { toast('Abrindo…'); try { await inv('profiles.launch', { id: p.id }); } catch (e) { toast('Erro: ' + e.message); } } }, svg('play', 13), 'Abrir'));
       box.append(el('button', { class: 'icon', title: 'Mais ações', onClick: (e) => openRowMenu(e, p) }, svg('dots')));
     }
     tr.append(actions);
@@ -882,7 +882,7 @@ async function openErrorLog() {
     const box = el('div', { class: 'idbox mono', style: 'max-height:52vh;overflow:auto' });
     list.forEach((e) => {
       const when = String(e.ts || '').replace('T', ' ').slice(0, 19);
-      box.append(el('div', { style: 'padding:7px 0;border-bottom:1px solid var(--line,#1e293b)' },
+      box.append(el('div', { style: 'padding:7px 0;border-bottom:1px solid var(--border)' },
         el('div', { style: 'color:var(--amber,#f59e0b)' }, `[${when}] ${e.source || 'app'}`),
         el('div', {}, e.message || ''),
         e.context ? el('div', { style: 'color:var(--muted);font-size:11px' }, 'ctx: ' + e.context) : null,

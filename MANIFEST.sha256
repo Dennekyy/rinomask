@@ -1,21 +1,21 @@
 # RinoMask — MANIFEST.sha256 (impressão digital do código-fonte)
 # Titular: Dennekyy (https://github.com/Dennekyy)
-# Gerado em: 2026-06-14T05:26:05.691Z
+# Gerado em: 2026-06-14T05:36:04.130Z
 # Arquivos: 54
-# HASH-RAIZ (SHA-256 de todos): b680ada4c15af11e40e134afce0c04bb8983dae7eec1a8676301feb57959d6d1
+# HASH-RAIZ (SHA-256 de todos): 68dbc636c7a548d7f04de8dde2d6bc0df8ec7e92afb86a3fccfd87b6f7bb8997
 #
 9dd4668799a7db0f617fdb60430b155f102e0ace41736d85fc75a2e9ee8df0e3  .gitignore
 77448d1ba19f472758bf016ad7ef48d77cc1655db4af5811e86cd3b2291ff7fb  AUTHORSHIP.md
 40435d9a238020f1359df8b8cb0b83c3b72b7a1d3a7e0af6fd1250b1920d2908  build/icon.ico
-94be4c5898a104628ae8dce4f561eef09f0d057a4b475b9d953e099fb22ec19d  electron/main.js
+ae9d36aae5cfaf4dba44d0ddde91b90bc96d31c412eb197cdf0e24da8a83141c  electron/main.js
 68906a0096da5e4c0cc48902b139948b18bbdab5245310e30f10fa4dcfbd5979  electron/preload.js
 ec452563de2ee95b0af664194581510e3b32262a5ba00cfcb557184309a3e8c0  LICENSE
 bf2f4bc8a57ddd28b8de51637ec93eedca0f478bd44deba1b89d8d1d1e43ff37  package.json
 1dabee739ef7785a8ad51c664ed7c2a80782fed9282b8abfac68d68c408f9700  README.md
-26a4d3d794d8e69f592f86ff18271036c2cb725b088518ab3a67ed816f5090d5  renderer/app.js
+8e972be75622499a046513f076875f69de3a0c8e196385dd39369671024a4fe8  renderer/app.js
 cba04a421e7fd5ebb875ee595469ef4d3b2ebdbc81fe062e06bbc7d249c0a9ee  renderer/index.html
 18b4fc621d8dd2e218d1c51bda1f657ea5fdaf799578d1794c4ff8460a083599  renderer/logo.svg
-cb752f774d5280e1c208381edd5d925982f4a436ebdae6450fbc5bc90d27dda6  renderer/style.css
+92dc4e0f562de463921f22cf7a2a685b617aa445c6dd0ebd291909d9d48c1b5f  renderer/style.css
 211c6c11c7520aecdb181894ee275c428190b9964695b20c2761411cad37c3d6  scripts/_enode.js
 46715dd5fe19ad9374fc535dd64b8950972084bee7d094236697711071cfd6e7  scripts/create-shortcut.vbs
 7172b4019fc7d6217938304c947cfe8c9dfabb7e0c219000632ed38f0b53adcc  scripts/fetch-rcedit.js

@@ -130,14 +130,14 @@ function createWindow() {
     height: 820,
     minWidth: 1000,
     minHeight: 640,
-    backgroundColor: '#0b1120',
+    backgroundColor: '#0f0f0f',
     title: 'RinoMask',
     icon: path.join(__dirname, '..', 'build', 'icon.ico'),
     autoHideMenuBar: true,
     // Barra de título integrada ao tema: esconde a nativa e recolore os
     // controles (min/maximizar/fechar) via Window Controls Overlay.
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#0b1120', symbolColor: '#cbd5e1', height: 38 },
+    titleBarOverlay: { color: '#0f0f0f', symbolColor: '#cccccc', height: 38 },
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

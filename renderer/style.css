@@ -1,43 +1,46 @@
 /* ============================================================
    RinoMask — Design System
-   Estilo: Data-Dense Dashboard · Paleta: Developer Tool (slate dark)
-   Tipografia: Inter/Segoe UI + Cascadia (mono). Acento: steel-blue→indigo.
+   Estilo: minimalista, elegante, funcional. Paleta neutra (preto/branco) + amarelo.
+   Inspirado no tema shadcn do projeto do autor (accent hsl 47 92% 52% = #f8c31c).
    ============================================================ */
 :root {
-  /* superfícies (slate / dev-tool) */
-  --bg: #0f172a;
-  --bg-side: #0b1120;
-  --surface: #1b2336;
-  --surface-2: #222b40;
-  --surface-3: #283350;
-  --border: #25314b;
-  --border-strong: #34415f;
+  /* superfícies (neutro, sem matiz azul) */
+  --bg: #0f0f0f;
+  --bg-side: #0f0f0f;
+  --surface: #1a1a1a;
+  --surface-2: #1f1f1f;
+  --surface-3: #262626;
+  --border: #2b2b2b;
+  --border-strong: #3a3a3a;
 
   /* texto */
-  --fg: #f8fafc;
-  --muted: #94a3b8;
-  --muted-2: #64748b;
+  --fg: #f5f5f5;
+  --muted: #9a9a9a;
+  --muted-2: #6e6e6e;
 
-  /* marca / acento */
-  --accent: #4f9cf9;
-  --accent-2: #818cf8;
-  --accent-soft: rgba(79, 156, 249, 0.14);
-  --grad: linear-gradient(135deg, #38bdf8 0%, #6366f1 60%, #818cf8 100%);
-  --ring: rgba(79, 156, 249, 0.55);
+  /* marca / acento — amarelo */
+  --brand: #f8c31c;
+  --accent: #f8c31c;
+  --accent-2: #f5b400;
+  --on-accent: #141100;                 /* texto sobre amarelo */
+  --accent-soft: rgba(248, 195, 28, 0.12);
+  --accent-line: rgba(248, 195, 28, 0.5);
+  --grad: linear-gradient(135deg, #f8c31c 0%, #f3b50a 100%);
+  --ring: rgba(248, 195, 28, 0.55);
 
   /* semânticos */
-  --green: #22c55e;
-  --amber: #f59e0b;
+  --green: #2ec16a;
+  --amber: #f5a623;
   --red: #ef4444;
   --violet: #a855f7;
 
   /* escala / forma */
   --r-sm: 7px;
-  --r: 10px;
-  --r-lg: 14px;
+  --r: 9px;
+  --r-lg: 13px;
   --row-h: 52px;
-  --shadow: 0 12px 34px rgba(2, 6, 23, 0.55);
-  --shadow-sm: 0 4px 14px rgba(2, 6, 23, 0.4);
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.4);
   --font: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
   --mono: "Cascadia Code", "Cascadia Mono", "JetBrains Mono", Consolas, ui-monospace, monospace;
 }
@@ -58,8 +61,7 @@ body {
   height: 100vh;
 }
 
-/* Barra de título própria (arrastável). Os controles nativos do Windows ficam
-   sobre o canto direito desta faixa, recoloridos via titleBarOverlay. */
+/* Barra de título própria (arrastável). */
 .titlebar {
   height: 38px; min-height: 38px;
   background: var(--bg-side);
@@ -71,46 +73,47 @@ body {
 .titlebar .tb-brand svg { width: 17px; height: 17px; }
 .titlebar .tb-brand .tb-logo { width: 20px; height: 20px; }
 
-/* Logo do RinoMask (SVG vetorizado) como MÁSCARA recolorível — muda a cor via background-color */
-.logo-mark { display: inline-block; flex: 0 0 auto; background-color: var(--brand, #f8c31c);
+/* Logo do RinoMask (SVG vetorizado) como MÁSCARA recolorível */
+.logo-mark { display: inline-block; flex: 0 0 auto; background-color: var(--brand);
   -webkit-mask: url(logo.svg) center / contain no-repeat; mask: url(logo.svg) center / contain no-repeat; }
 .titlebar button, .titlebar input, .titlebar a { -webkit-app-region: no-drag; }
 
 .app { display: flex; flex: 1; min-height: 0; }
 
-/* foco visível global (acessibilidade — prioridade alta) */
+/* foco visível global */
 :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 6px; }
 button:focus-visible, .nav-item:focus-visible { outline-offset: 1px; }
 
 /* ---------------- Sidebar ---------------- */
 .sidebar {
-  width: 240px; min-width: 240px;
+  width: 236px; min-width: 236px;
   background: var(--bg-side);
   border-right: 1px solid var(--border);
   display: flex; flex-direction: column;
   padding: 14px 12px;
-  gap: 2px;
+  gap: 1px;
   overflow-y: auto;
 }
-.brand { display: flex; align-items: center; gap: 11px; padding: 6px 8px 18px; }
+.brand { display: flex; align-items: center; gap: 11px; padding: 6px 8px 20px; }
 .brand .logo { width: 34px; height: 34px; display: grid; place-items: center; }
 .brand .logo .logo-mark { width: 34px; height: 34px; }
 .brand b { font-size: 15px; letter-spacing: -0.2px; font-weight: 700; }
-.brand span { display: block; font-size: 10px; color: var(--muted-2); font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; }
-.nav-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted-2); padding: 14px 10px 5px; font-weight: 600; }
+.brand span { display: block; font-size: 9.5px; color: var(--muted-2); font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
+.nav-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.9px; color: var(--muted-2); padding: 16px 10px 6px; font-weight: 600; }
 .nav-item {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 11px;
   padding: 8px 10px; border-radius: var(--r-sm); cursor: pointer; color: var(--muted);
-  font-weight: 500; transition: background 0.15s, color 0.15s;
+  font-weight: 500; transition: background 0.13s, color 0.13s; position: relative;
 }
 .nav-item:hover { background: var(--surface); color: var(--fg); }
-.nav-item.active { background: var(--accent-soft); color: #cfe0ff; box-shadow: inset 2px 0 0 var(--accent); }
-.nav-item .ic { width: 18px; height: 18px; display: grid; place-items: center; color: currentColor; opacity: 0.85; flex: none; }
+.nav-item.active { background: var(--accent-soft); color: var(--fg); }
+.nav-item.active::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
+.nav-item .ic { width: 18px; height: 18px; display: grid; place-items: center; color: currentColor; opacity: 0.8; flex: none; }
 .nav-item .ic svg { width: 16px; height: 16px; }
-.nav-item.active .ic { opacity: 1; }
+.nav-item.active .ic { opacity: 1; color: var(--accent); }
 .nav-item .lbl { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nav-item .count { font-size: 11px; color: var(--muted-2); background: var(--surface); padding: 1px 8px; border-radius: 20px; font-weight: 600; }
-.nav-item.active .count { background: rgba(79, 156, 249, 0.2); color: #cfe0ff; }
+.nav-item .count { font-size: 11px; color: var(--muted-2); background: var(--surface-2); padding: 1px 8px; border-radius: 20px; font-weight: 600; }
+.nav-item.active .count { background: var(--accent-soft); color: var(--accent); }
 .nav-item .dot-color { width: 10px; height: 10px; border-radius: 3px; flex: none; box-shadow: 0 0 0 1px rgba(255,255,255,0.08); }
 .sb-spacer { flex: 1; min-height: 8px; }
 .sb-divider { height: 1px; background: var(--border); margin: 8px 6px; }
@@ -156,17 +159,21 @@ button svg { width: 15px; height: 15px; flex: none; }
 button:hover { background: var(--surface-2); border-color: var(--border-strong); }
 button:active { transform: translateY(0.5px); }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
-button.primary { background: var(--grad); border: none; color: #06121f; font-weight: 700; box-shadow: 0 4px 14px rgba(79, 156, 249, 0.28); }
-button.primary:hover { filter: brightness(1.08); background: var(--grad); }
+button.primary { background: var(--accent); border: 1px solid transparent; color: var(--on-accent); font-weight: 700; }
+button.primary:hover { background: var(--accent); filter: brightness(1.06); border-color: transparent; }
+button.primary svg { color: var(--on-accent); }
 button.ghost { background: transparent; }
 button.ghost:hover { background: var(--surface); }
-button.danger { color: #fca5a5; border-color: rgba(239, 68, 68, 0.35); background: transparent; }
+button.danger { color: #f7a4a4; border-color: rgba(239, 68, 68, 0.35); background: transparent; }
 button.danger:hover { background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.5); }
 button.sm { padding: 6px 11px; font-size: 12px; min-height: 30px; }
 button.sm svg { width: 14px; height: 14px; }
 button.icon { padding: 7px; background: transparent; border-color: transparent; color: var(--muted); min-height: 32px; }
 button.icon:hover { background: var(--surface-2); color: var(--fg); }
 button.icon svg { width: 17px; height: 17px; }
+/* "Abrir" da linha: neutro discreto, com o ícone em amarelo (ação principal sem poluir de amarelo) */
+button.open svg { color: var(--accent); }
+button.open:hover { background: var(--accent-soft); border-color: var(--accent-line); color: var(--fg); }
 
 /* ---------------- Bulk bar ---------------- */
 .bulkbar {
@@ -174,13 +181,13 @@ button.icon svg { width: 17px; height: 17px; }
   padding: 10px 18px; background: var(--accent-soft);
   border-bottom: 1px solid var(--border);
 }
-.bulkbar .count { font-weight: 700; color: #cfe0ff; margin-right: 4px; }
+.bulkbar .count { font-weight: 700; color: var(--accent); margin-right: 4px; }
 
 /* ---------------- Sync bar ---------------- */
 .syncbar {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 18px; border-bottom: 1px solid var(--border);
-  background: linear-gradient(90deg, rgba(56, 189, 248, 0.12), rgba(129, 140, 248, 0.06));
+  background: var(--accent-soft);
 }
 .syncbar .pulse { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: pulse 1.4s infinite; flex: none; }
 @keyframes pulse { 50% { opacity: 0.3; } }
@@ -192,7 +199,7 @@ button.icon svg { width: 17px; height: 17px; }
 table { width: 100%; border-collapse: collapse; }
 thead th {
   position: sticky; top: 0; background: var(--bg); z-index: 2;
-  text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.6px;
+  text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.7px;
   color: var(--muted-2); font-weight: 600; padding: 12px 12px; border-bottom: 1px solid var(--border);
 }
 tbody td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; height: var(--row-h); }
@@ -218,14 +225,13 @@ tbody tr.sel { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--a
 .row-actions { display: flex; gap: 5px; justify-content: flex-end; align-items: center; }
 input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
 .empty { text-align: center; color: var(--muted-2); padding: 70px 20px; }
-.empty .big { display: grid; place-items: center; margin-bottom: 14px; opacity: 0.6; }
-.empty .big svg { width: 64px; height: 64px; }
-.empty .big .logo-mark { width: 84px; height: 84px; opacity: 0.9; }
+.empty .big { display: grid; place-items: center; margin-bottom: 16px; }
+.empty .big .logo-mark { width: 88px; height: 88px; opacity: 0.45; background-color: var(--muted); }
 
 /* ---------------- Modal ---------------- */
 .modal-root { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 100; }
 .modal-root.show { display: flex; }
-.scrim { position: absolute; inset: 0; background: rgba(2, 6, 23, 0.66); backdrop-filter: blur(3px); }
+.scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(3px); }
 .modal {
   position: relative; background: var(--surface); border: 1px solid var(--border-strong);
   border-radius: var(--r-lg); width: 620px; max-width: 94vw; max-height: 90vh;
@@ -251,11 +257,11 @@ legend { color: var(--muted-2); font-size: 10.5px; padding: 0 6px; text-transfor
 .seg { display: flex; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
 .seg button { border: none; border-radius: 0; background: var(--surface-2); padding: 7px 12px; font-size: 12px; flex: 1; min-height: 32px; text-transform: capitalize; color: var(--muted); }
 .seg button:hover { background: var(--surface-3); }
-.seg button.on { background: var(--grad); color: #06121f; font-weight: 700; }
+.seg button.on { background: var(--accent); color: var(--on-accent); font-weight: 700; }
 .taglist { display: flex; flex-wrap: wrap; gap: 6px; }
 .pick { padding: 5px 11px; border-radius: 20px; border: 1px solid var(--border); cursor: pointer; font-size: 12px; transition: all 0.12s; color: var(--muted); }
 .pick:hover { border-color: var(--border-strong); color: var(--fg); }
-.pick.on { background: var(--accent-soft); border-color: var(--accent); color: #cfe0ff; }
+.pick.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .list-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); }
 .list-row .grow { flex: 1; }
 .mono { font-family: var(--mono); font-size: 12px; letter-spacing: -0.2px; }
@@ -272,8 +278,8 @@ legend { color: var(--muted-2); font-size: 10.5px; padding: 0 6px; text-transfor
 .ctx .it { padding: 8px 10px; border-radius: var(--r-sm); cursor: pointer; color: var(--fg); display: flex; gap: 10px; align-items: center; font-weight: 500; }
 .ctx .it svg { width: 16px; height: 16px; color: var(--muted); }
 .ctx .it:hover { background: var(--surface-3); }
-.ctx .it.danger { color: #fca5a5; }
-.ctx .it.danger svg { color: #fca5a5; }
+.ctx .it.danger { color: #f7a4a4; }
+.ctx .it.danger svg { color: #f7a4a4; }
 .ctx .sep { height: 1px; background: var(--border); margin: 5px 4px; }
 
 /* ---------------- Dropdown (bulk) ---------------- */
@@ -291,15 +297,16 @@ legend { color: var(--muted-2); font-size: 10.5px; padding: 0 6px; text-transfor
 .lock {
   position: fixed; inset: 0; z-index: 500; display: none;
   align-items: center; justify-content: center;
-  background: radial-gradient(1200px 600px at 50% -10%, #16203a, var(--bg));
+  background: radial-gradient(1000px 520px at 50% -10%, #1c1c1c, var(--bg));
 }
 .lock-card {
   width: 320px; background: var(--surface); border: 1px solid var(--border-strong);
   border-radius: var(--r-lg); padding: 28px 26px; text-align: center; box-shadow: var(--shadow);
 }
-.lock-logo { width: 60px; height: 60px; margin: 0 auto 8px; }
-.lock-logo svg { width: 60px; height: 60px; }
+.lock-logo { width: 64px; height: 64px; margin: 0 auto 8px; }
+.lock-logo svg { width: 64px; height: 64px; }
 .lock-logo .logo-mark { width: 64px; height: 64px; }
+
 /* Barra de aviso de atualização disponível */
 .updatebar {
   position: fixed; top: 46px; left: 50%; transform: translateX(-50%);
@@ -308,7 +315,7 @@ legend { color: var(--muted-2); font-size: 10.5px; padding: 0 6px; text-transfor
   border: 1px solid var(--border-strong); border-radius: 10px;
   padding: 8px 12px; box-shadow: var(--shadow); font-size: 13px; max-width: 92vw;
 }
-.updatebar svg { color: var(--amber); flex: 0 0 auto; }
+.updatebar svg { color: var(--accent); flex: 0 0 auto; }
 .updatebar button { min-height: 28px; }
 
 .lock-card h2 { font-size: 19px; letter-spacing: -0.3px; }
