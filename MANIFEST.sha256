@@ -1,8 +1,8 @@
 # RinoMask — MANIFEST.sha256 (impressão digital do código-fonte)
 # Titular: Dennekyy (https://github.com/Dennekyy)
-# Gerado em: 2026-06-14T21:40:49.402Z
+# Gerado em: 2026-06-14T21:59:06.847Z
 # Arquivos: 55
-# HASH-RAIZ (SHA-256 de todos): ca8890bdc094dac5f13d852d241d6ab313c2662a4501414cd2fbf1c35dcfe6c4
+# HASH-RAIZ (SHA-256 de todos): 6ef623cf30990722ceaf7770c98fea941bf880de324e4d19562ab80c075bf194
 #
 55b431fcf2ba7813a772553d87d4fe1ee6d7489ea9d7d6a587f5e672473df3fe  .gitignore
 77448d1ba19f472758bf016ad7ef48d77cc1655db4af5811e86cd3b2291ff7fb  AUTHORSHIP.md
@@ -27,7 +27,7 @@ cf05b9db2d48a3929b214f9ddf09d9786b2de3a9ba041160992b5215a54a9de1  scripts/make-i
 6e8d50bad994280e15847a78c7d72e456e462dc0be22c8689ad0eedabf65e596  scripts/test-advanced.js
 7be4a574a3804bcd8824331734578fa8dfcb37ff10b9f5e0b58f37b55dd1949d  scripts/test-bridge.js
 84d2fb6ff38b2f256f96b7ad57e250da26e7729e0f24edcbbee1d11667f8c3b7  scripts/test-camoufox.js
-c651661c93c59cf4bbf2fd272a35e2f0f2b453d9904d44be5342a2e94493c906  scripts/test-consent.js
+a60124ee6b4b72d14bf159e55e621d11308dd46487165838a8a543f37ebd39d3  scripts/test-consent.js
 8cc466cb9cbc0694967c0619e06ff81681b31868378cb9f27959e42084253c9a  scripts/test-detect.js
 3c645f03db142cfe365759598d95bc0424b866881b2bb708d230fa6c28e8b820  scripts/test-isolation.js
 e65616ef25fc40acefe9687b8fd5f1a31aa16dec5ef42bf665db6c250522d61b  scripts/test-launch.js
@@ -43,7 +43,7 @@ e137f22e335f254c981688ebcaf6b2f4416c5ea802905a9b6612e515c551fcff  scripts/test-u
 ccfbe0d444d8ce6e2caeb6042a5caa6482e99e0b24e12b462ef840cb4ac3a5e1  scripts/test-window.js
 33f44fb1d75508a71fd4f89ee6cee9db7d3f5285b25a24869e46832038127929  src/branding.js
 6771aca3e4c15057d7b4136d62c178ce43970e25780c440f940f3c6bdef8c783  src/browserLauncher.js
-dff57423bffdb4d2add89f79e8d0f7a17f51dbddff403956da0841337b2fcc6c  src/cookieRobot.js
+cf73524a87e56d646ef34798ac5f4dba624d038693fdd3a10d26d32404056915  src/cookieRobot.js
 b2e8d37d5d979bde249950bc7aff6038e82bece61781ecf1dbeb10712b8dea61  src/detect/coherence.js
 89d71753f93da9ea8197fc747b727ed6db14f12703285825a21448d730fe4398  src/detect/index.js
 f85e28eedbe651fd4f7dfcfb53247991b88093133f621a15c779b729cc95675b  src/detect/oracles.js

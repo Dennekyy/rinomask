@@ -89,12 +89,14 @@ function dismissConsentInFrame() {
     if (REJECT.test(t)) continue;                 // nunca rejeitar/gerenciar
     var ctx = inCookieCtx(el);
     var idc = ((el.id || '') + ' ' + (el.className || '')).toLowerCase();
+    var accId = /accept|agree|consent|allow|aceit|concord|cookie/.test(idc);
+    var strong = STRONG.test(t), weak = WEAK.test(t);
+    // Só clica DENTRO de um contexto de cookie; fora dele, exige texto forte + classe/id de aceite
+    // (evita clicar em "Aceitar convite/termos", "OK" de boas-vindas, etc.).
     var score = 0;
-    if (STRONG.test(t)) score += 5;
-    else if (WEAK.test(t) && ctx) score += 2;     // "OK/Sim" só conta dentro de banner de cookie
-    if (/accept|agree|consent|allow|aceit|concord/.test(idc)) score += 3;
-    if (ctx) score += 4;
-    if (score >= 5) { if (score > bestScore) { bestScore = score; best = el; } }
+    if (ctx) { if (strong) score = 9; else if (weak) score = 6; else if (accId) score = 6; }
+    else if (strong && accId) score = 6;
+    if (score >= 6 && score > bestScore) { bestScore = score; best = el; }
   }
   if (best) { try { best.scrollIntoView({ block: 'center' }); } catch (e) {} try { best.click(); } catch (e) {} return txt(best).slice(0, 50); }
   return null;
