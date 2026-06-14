@@ -1,8 +1,8 @@
 # RinoMask — MANIFEST.sha256 (impressão digital do código-fonte)
 # Titular: Dennekyy (https://github.com/Dennekyy)
-# Gerado em: 2026-06-14T20:59:57.543Z
+# Gerado em: 2026-06-14T21:17:37.478Z
 # Arquivos: 54
-# HASH-RAIZ (SHA-256 de todos): b88ae5733c622771e2ede20a520e8cd489a6b752fe0914f8995eddf61fc99258
+# HASH-RAIZ (SHA-256 de todos): 58daaa2f314b661302d89d59d25041f8a1f492d7aa4d4c8dbf01012431829690
 #
 55b431fcf2ba7813a772553d87d4fe1ee6d7489ea9d7d6a587f5e672473df3fe  .gitignore
 77448d1ba19f472758bf016ad7ef48d77cc1655db4af5811e86cd3b2291ff7fb  AUTHORSHIP.md
@@ -10,7 +10,7 @@
 f616a84cd1147ee9ae784bfd567cac2f1ff6dd1687c68ff0ea068ff9422f0b0f  electron/main.js
 68906a0096da5e4c0cc48902b139948b18bbdab5245310e30f10fa4dcfbd5979  electron/preload.js
 ec452563de2ee95b0af664194581510e3b32262a5ba00cfcb557184309a3e8c0  LICENSE
-f7674822a541eb45e45df04ae1eb8cd1f3de558d5923b06fb5e9ffa13fde9b0c  package.json
+3e6a0ccd5ac42380d6b7f9d913ec572c6d39821b9f346e9df1e82db177a04870  package.json
 1dabee739ef7785a8ad51c664ed7c2a80782fed9282b8abfac68d68c408f9700  README.md
 8e972be75622499a046513f076875f69de3a0c8e196385dd39369671024a4fe8  renderer/app.js
 cba04a421e7fd5ebb875ee595469ef4d3b2ebdbc81fe062e06bbc7d249c0a9ee  renderer/index.html
