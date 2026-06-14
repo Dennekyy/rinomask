@@ -40,6 +40,8 @@ const CASES = [
   { name: 'DECOY: "OK" SEM contexto de cookie', click: false, html: `<div style="padding:20px"><p>Bem-vindo ao site.</p><button onclick="${BAD}">OK</button></div>` },
   { name: 'DECOY: "Aceitar convite" sem cookie', click: false, html: `<div style="padding:20px"><p>Você foi convidado.</p><button onclick="${BAD}">Aceitar convite</button></div>` },
   { name: 'NEG: só "Rejeitar/Gerenciar" (sem aceitar)', click: false, html: banner(`<button onclick="${BAD}">Gerenciar opções</button><button onclick="${BAD}">Rejeitar</button>`) },
+  { name: 'real: "Usamos cookies... OK" (caso do usuário)', click: true, html: `<div style="position:fixed;bottom:0;left:0;right:0;background:#222;color:#fff;padding:16px"><span>Usamos cookies para personalizar a sua experiência. Ao utilizar nossos sites e serviços, você concorda com o uso de cookies por nossa parte conforme estabelecido na nossa <a href="#" onclick="${BAD}">Política de privacidade</a>.</span> <button onclick="${ACC}">OK</button></div>` },
+  { name: 'estrutura: texto e botão em ramos separados', click: true, html: `<div style="position:fixed;bottom:0;left:0;right:0;background:#222;color:#fff;padding:16px;display:flex"><div><p>Este site usa cookies conforme a Política de Privacidade.</p></div><div><button onclick="${BAD}">Configurar</button><button onclick="${ACC}">OK</button></div></div>` },
 ];
 
 (async function main() {
@@ -71,6 +73,18 @@ const CASES = [
   const ifr = page.frames().find((fr) => fr !== page.mainFrame());
   r = ifr ? await ifr.evaluate(() => ({ acc: document.body.getAttribute('data-acc'), bad: document.body.getAttribute('data-bad') })) : {};
   check('iframe: aceita e não recusa', r.acc === '1' && !r.bad, JSON.stringify(r));
+
+  // banner que aparece com ATRASO (2.5s) — testa a janela persistente de ~7s
+  await page.setContent('<!doctype html><html><body></body></html>');
+  await page.evaluate(() => setTimeout(() => {
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#222;color:#fff;padding:16px';
+    d.innerHTML = "Usamos cookies e tecnologias semelhantes. <button onclick=\"document.body.setAttribute('data-acc','1')\">OK</button>";
+    document.body.appendChild(d);
+  }, 2500));
+  await cookieRobot.acceptConsent(page);
+  r = await page.evaluate(() => ({ acc: document.body.getAttribute('data-acc') }));
+  check('banner com atraso (2,5s): aceito dentro da janela', r.acc === '1', JSON.stringify(r));
 
   await launcher.stop(p.id).catch(() => {});
   await require('fs/promises').rm(tmp, { recursive: true, force: true }).catch(() => {});
