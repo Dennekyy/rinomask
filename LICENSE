@@ -1,0 +1,23 @@
+RinoMask — Licença Proprietária
+Copyright (c) 2026 Dennekyy
+Todos os direitos reservados. / All rights reserved.
+
+Este software ("RinoMask"), incluindo todo o seu código-fonte, recursos, design,
+marca, logotipo e documentação, é propriedade intelectual EXCLUSIVA do titular do
+copyright indicado acima.
+
+É PROIBIDO, sem autorização expressa, prévia e por escrito do titular:
+  - copiar, reproduzir ou redistribuir, no todo ou em parte;
+  - modificar, adaptar, traduzir ou criar obras derivadas;
+  - sublicenciar, vender, alugar ou explorar comercialmente;
+  - remover ou alterar avisos de autoria/copyright.
+
+A posse deste código ou binário não transfere qualquer direito de propriedade.
+
+ISENÇÃO DE GARANTIA: O software é fornecido "no estado em que se encontra", sem
+garantias de qualquer tipo. O titular não se responsabiliza pelo uso indevido.
+
+Dependências de terceiros (ex.: Electron, Camoufox, Playwright, camoufox-js) são
+de seus respectivos autores e mantêm suas próprias licenças (ver node_modules).
+
+Titular / contato: https://github.com/Dennekyy

@@ -1,0 +1,24 @@
+# Dependências e saídas de build
+node_modules/
+dist/
+release/
+
+# Dados locais / runtime (nunca versionar)
+data/
+*.log
+store.json
+*.ots
+
+# Binário de terceiros baixado no postinstall (não versionar)
+build/rcedit-x64.exe
+build/_iconmaker.html
+
+# Marcador interno e temporários
+.rinomask-branded
+*.tmp
+preview-*.png
+
+# SO / editores
+Thumbs.db
+.DS_Store
+.vscode/

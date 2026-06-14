@@ -1,0 +1,71 @@
+{
+  "name": "rinomask",
+  "productName": "RinoMask",
+  "version": "2.0.0",
+  "description": "RinoMask — navegador antidetect: gerenciamento visual de perfis, fingerprints avancadas, biblioteca de proxies, status/tags/pastas, acoes em massa, cookies, lixeira e sincronizador.",
+  "author": "Dennekyy",
+  "license": "UNLICENSED",
+  "homepage": "https://github.com/Dennekyy/rinomask",
+  "repository": { "type": "git", "url": "https://github.com/Dennekyy/rinomask.git" },
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "shortcut": "cscript //nologo scripts/create-shortcut.vbs",
+    "test:isolation": "node scripts/test-isolation.js",
+    "test:bridge": "node scripts/test-bridge.js",
+    "test:ui": "node scripts/test-ui.js",
+    "test:camoufox": "node scripts/_enode.js scripts/test-camoufox.js",
+    "test:stability": "node scripts/_enode.js scripts/test-stability.js",
+    "test:launch": "node scripts/_enode.js scripts/test-launch.js",
+    "test:warm": "node scripts/_enode.js scripts/test-warm.js",
+    "test:proxy": "node scripts/_enode.js scripts/test-proxy.js",
+    "test:vault": "node scripts/test-vault.js",
+    "test:ui:vault": "node scripts/test-ui-vault.js",
+    "test:trust": "node scripts/_enode.js scripts/test-trust.js",
+    "test:window": "node scripts/_enode.js scripts/test-window.js",
+    "test:advanced": "node scripts/_enode.js scripts/test-advanced.js",
+    "test:manual": "node scripts/_enode.js scripts/test-manual.js",
+    "manifest": "node scripts/make-manifest.js",
+    "icon": "electron scripts/make-icon.js",
+    "dist": "electron-builder --win",
+    "dist:dir": "electron-builder --win --dir",
+    "postinstall": "node scripts/setup-electron.js && node scripts/fetch-rcedit.js"
+  },
+  "dependencies": {
+    "camoufox-js": "^0.11.0",
+    "https-proxy-agent": "^7.0.4",
+    "playwright": "1.53.1",
+    "socks-proxy-agent": "^8.0.3"
+  },
+  "devDependencies": {
+    "electron": "^31.3.1",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.rinomask.app",
+    "productName": "RinoMask",
+    "copyright": "Copyright (c) 2026 Dennekyy",
+    "asar": false,
+    "npmRebuild": false,
+    "files": [
+      "electron/**",
+      "src/**",
+      "renderer/**",
+      "build/icon.*",
+      "build/rcedit-x64.exe",
+      "package.json",
+      "!scripts/**",
+      "!**/*.map"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}
