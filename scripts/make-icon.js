@@ -1,7 +1,9 @@
 'use strict';
-// Gera os ícones do app a partir da logo4 (rinoceronte preto): emblema PRETO sobre fundo
-// AMARELO #f8c31c (quadrado arredondado), em build/icon.ico (+ icon.png). Também renderiza
-// um preview do SVG traçado (renderer/logo.svg) para conferência.
+// Gera, a partir da logo4 (rinoceronte preto), tudo a partir da MESMA arte fiel:
+//   - build/icon.ico (+ icon.png): emblema PRETO sobre fundo AMARELO #f8c31c (canto arredondado)
+//   - renderer/logo.png: máscara TRANSPARENTE em alta resolução (preto = opaco, branco = furo)
+//     usada como `mask` recolorível no app. Preserva os detalhes finos (inclusive o OLHO),
+//     que a vetorização bi-level achatava.
 // Rodar: node_modules/electron/dist/electron.exe scripts/make-icon.js  (ou: npm run icon)
 const { app, BrowserWindow, nativeImage } = require('electron');
 const fs = require('fs');
@@ -10,7 +12,6 @@ const path = require('path');
 const SIZES = [256, 128, 64, 48, 32, 16];
 const root = path.join(__dirname, '..');
 const LOGO = path.join(root, 'build', 'logo4-src.png');
-const SVG = path.join(root, 'renderer', 'logo.svg');
 const TMP = path.join(root, 'build', '_iconmaker.html');
 const YELLOW = '#f8c31c';
 
@@ -35,47 +36,49 @@ app.whenReady().then(async () => {
   fs.writeFileSync(TMP, `<!doctype html><html><body style="margin:0">
     <canvas id="c" width="1024" height="1024"></canvas>
     <script>
+      const S = 1024;
       window.render = () => new Promise((res) => {
         const img = new Image();
         img.onload = () => {
           const c = document.getElementById('c'), x = c.getContext('2d');
-          const S = 1024, r = 224; // canto arredondado
+          // 1) ícone: fundo amarelo arredondado + emblema preto (multiply)
+          x.clearRect(0,0,S,S);
+          const r = 224;
           x.fillStyle = ${JSON.stringify(YELLOW)};
-          x.beginPath();
-          x.moveTo(r,0); x.arcTo(S,0,S,S,r); x.arcTo(S,S,0,S,r); x.arcTo(0,S,0,0,r); x.arcTo(0,0,S,0,r); x.closePath(); x.fill();
-          // emblema preto via multiply (branco da logo vira amarelo, preto continua preto)
+          x.beginPath(); x.moveTo(r,0); x.arcTo(S,0,S,S,r); x.arcTo(S,S,0,S,r); x.arcTo(0,S,0,0,r); x.arcTo(0,0,S,0,r); x.closePath(); x.fill();
           x.save(); x.clip(); x.globalCompositeOperation = 'multiply';
-          const pad = 36, w = S - pad*2;
-          x.drawImage(img, pad, pad, w, w);
+          const pad = 36, w = S - pad*2; x.drawImage(img, pad, pad, w, w);
           x.restore();
-          res(c.toDataURL('image/png'));
+          const icon = c.toDataURL('image/png');
+          // 2) máscara transparente: alpha = escuridão (preto->opaco, branco->furo). Preserva o olho.
+          x.globalCompositeOperation = 'source-over';
+          x.clearRect(0,0,S,S);
+          x.drawImage(img, 0, 0, S, S);
+          const d = x.getImageData(0,0,S,S), p = d.data;
+          for (let i=0;i<p.length;i+=4){ const a=p[i+3]; const lum = 0.299*p[i]+0.587*p[i+1]+0.114*p[i+2]; p[i]=p[i+1]=p[i+2]=0; p[i+3]=Math.round((255-lum)*a/255); }
+          x.putImageData(d,0,0);
+          const mask = c.toDataURL('image/png');
+          res({ icon, mask });
         };
-        img.onerror = () => res('');
+        img.onerror = () => res(null);
         img.src = 'data:image/png;base64,${logoB64}';
       });
     </script></body></html>`);
 
   const win = new BrowserWindow({ width: 1024, height: 1024, show: false, webPreferences: { offscreen: true } });
   await win.loadFile(TMP);
-  const dataUrl = await win.webContents.executeJavaScript('window.render()');
-  if (!dataUrl) throw new Error('falha ao compor o ícone no canvas');
-  const master = nativeImage.createFromDataURL(dataUrl);
+  const out = await win.webContents.executeJavaScript('window.render()');
+  if (!out || !out.icon) throw new Error('falha ao compor no canvas');
 
+  const master = nativeImage.createFromDataURL(out.icon);
   const images = SIZES.map((s) => ({ size: s, buf: master.resize({ width: s, height: s, quality: 'best' }).toPNG() }));
   fs.writeFileSync(path.join(root, 'build', 'icon.ico'), makeIco(images));
   fs.writeFileSync(path.join(root, 'build', 'icon.png'), master.resize({ width: 256, height: 256, quality: 'best' }).toPNG());
 
-  // preview do SVG traçado: branco sobre fundo escuro (confere o tracing)
-  if (fs.existsSync(SVG)) {
-    const svg = fs.readFileSync(SVG, 'utf8').replace('currentColor', '#ffffff');
-    fs.writeFileSync(TMP, `<!doctype html><html><body style="margin:0;background:#0b0b0b;display:grid;place-items:center;height:1024px"><div style="width:760px;height:760px;color:#fff">${svg}</div></body></html>`);
-    await win.loadFile(TMP);
-    await new Promise((r) => setTimeout(r, 300));
-    const prev = await win.webContents.capturePage();
-    fs.writeFileSync(path.join(root, 'build', '_logo-preview.png'), prev.toPNG());
-  }
-  fs.rmSync(TMP, { force: true });
+  const mask = nativeImage.createFromDataURL(out.mask);
+  fs.writeFileSync(path.join(root, 'renderer', 'logo.png'), mask.resize({ width: 512, height: 512, quality: 'best' }).toPNG());
 
-  console.log('  build/icon.ico + icon.png (preto sobre amarelo) e build/_logo-preview.png criados.');
+  fs.rmSync(TMP, { force: true });
+  console.log('  build/icon.ico + icon.png (preto sobre amarelo) e renderer/logo.png (máscara fiel, com o olho) criados.');
   app.quit();
 }).catch((e) => { console.error('ERRO:', e && e.message || e); try { fs.rmSync(TMP, { force: true }); } catch (x) {} app.exit(1); });

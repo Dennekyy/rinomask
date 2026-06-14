@@ -79,7 +79,7 @@ async function warmProfile(id) {
       store.markLaunched(id);
       notifyChanged();
     }
-    const page = launcher.getPage(id);
+    const page = await launcher.getPage(id);
     if (!page) { emit('warm:done', { id, error: 'sem página disponível' }); return; }
     emit('warm:start', { id });
     const r = await cookieRobot.warmUp(page, { onProgress: (pr) => emit('warm:progress', { id, ...pr }) });
@@ -109,7 +109,7 @@ async function auditProfile(id, oracles) {
       await launcher.launchAutomation(prof, { headless: process.env.RINOMASK_HEADLESS === '1' });
       launched = true; store.markLaunched(id); notifyChanged();
     }
-    const page = launcher.getPage(id);
+    const page = await launcher.getPage(id);
     if (!page) { emit('detect:done', { id, error: 'sem página disponível' }); return; }
     emit('detect:start', { id });
     const report = await detect.audit(page, { oracles: oracles || ['leaks', 'browserscan', 'iphey', 'creepjs'], onProgress: (s) => emit('detect:progress', { id, ...s }) });

@@ -75,7 +75,7 @@ body {
 
 /* Logo do RinoMask (SVG vetorizado) como MÁSCARA recolorível */
 .logo-mark { display: inline-block; flex: 0 0 auto; background-color: var(--brand);
-  -webkit-mask: url(logo.svg) center / contain no-repeat; mask: url(logo.svg) center / contain no-repeat; }
+  -webkit-mask: url(logo.png) center / contain no-repeat; mask: url(logo.png) center / contain no-repeat; }
 .titlebar button, .titlebar input, .titlebar a { -webkit-app-region: no-drag; }
 
 .app { display: flex; flex: 1; min-height: 0; }
