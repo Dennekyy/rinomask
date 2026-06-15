@@ -30,6 +30,7 @@
     "test:manual": "node scripts/_enode.js scripts/test-manual.js",
     "test:detect": "node scripts/_enode.js scripts/test-detect.js",
     "test:consent": "node scripts/_enode.js scripts/test-consent.js",
+    "debug:warm": "node scripts/_enode.js scripts/debug-warm.js",
     "manifest": "node scripts/make-manifest.js",
     "icon": "electron scripts/make-icon.js",
     "dist": "electron-builder --win",

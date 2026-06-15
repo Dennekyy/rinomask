@@ -68,11 +68,14 @@ const CONSENT_SELECTORS = [
 // que não seja rejeitar/gerenciar/política (cobre "OK" implícito). Retorna o texto clicado (ou null).
 /* eslint-disable */
 function dismissConsentInFrame() {
-  var ACCEPT = /(aceit|accept|concord|i agree|\bagree\b|allow|permitir|consinto|consent|\bok\b|\bsim\b|\byes\b|entendi|got it|prossegui|continuar|tudo bem|understood|ciente|fechar e aceitar|li e (aceito|concordo)|estou de acordo|de acordo)/i;
-  var REJECT = /(rejeit|recus|reject|decline|negar|gerenciar|configurar|personalizar|customize|manage|settings|prefer)/i;
-  var REJECT2 = /(op[cç][õo]es|mais op|saiba mais|learn more|only necessary|apenas (necess|essenc)|essenciais|necess[aá]rios|n[aã]o aceit|withdraw|pol[ií]tica|privacy policy|cookie policy|mais tarde|agora n[aã]o|not now|depois|dispensar|dismiss)/i;
-  var COOKIE = /(cookie|consent|consentimento|privac|gdpr|lgpd|prote[cç][aã]o de dados|usamos cookies|we use cookies|rastre)/i;
+  // Multilíngue (PT/EN/ES) — com proxy, o banner aparece no idioma do país do perfil.
+  var ACCEPT = /(aceit|accept|acept|concord|i agree|\bagree\b|allow|permitir|consinto|consent|\bok\b|\bsim\b|\byes\b|entendi|got it|prossegui|continuar|tudo bem|understood|ciente|de acordo|de acuerdo|estoy de acuerdo)/i;
+  var REJECT = /(rejeit|rechaz|recus|reject|decline|negar|gerenciar|gestionar|configurar|personalizar|customize|manage|settings|ajustes|prefer)/i;
+  var REJECT2 = /(op[cç][õo]es|opciones|m[aá]s op|mais op|saiba mais|learn more|only necessary|solo (necesarias|esenciales)|apenas (necess|essenc)|essenciais|necess[aá]rios|n[aã]o aceit|optar por no|withdraw|pol[ií]tica|privacy policy|cookie policy|aviso de privac|privacidad|\bprivacy\b|mais tarde|agora n[aã]o|not now|depois|dispensar|dismiss)/i;
+  // Específico de banner de cookie (NÃO casa rodapé que só cita "privacidade").
+  var COOKIE = /(cookie|consent|consentimento|gdpr|lgpd)/i;
   var isReject = function (s) { return REJECT.test(s) || REJECT2.test(s); };
+  var inIframe = true; try { inIframe = window.top !== window.self; } catch (e) { inIframe = true; } // cross-origin = iframe (já é overlay)
 
   function txt(el) { try { return ((el.innerText || el.textContent || '') + '').replace(/\s+/g, ' ').trim(); } catch (e) { return ''; } }
   function label(el) { var l = txt(el); if (!l && el.getAttribute) l = el.getAttribute('aria-label') || el.getAttribute('title') || ''; if (!l) l = el.value || ''; return (l + '').replace(/\s+/g, ' ').trim(); }
@@ -87,19 +90,30 @@ function dismissConsentInFrame() {
     try { if (getComputedStyle(el).cursor === 'pointer' && label(el).length > 0 && label(el).length < 40) return true; } catch (e) {}
     return false;
   }
+  // Banner de cookie de verdade é um OVERLAY (fixed/sticky ou z-index alto sobre o conteúdo).
+  // Isso separa o banner do RODAPÉ/menu estático que também cita "cookies/privacidade".
+  function isOverlay(el) {
+    var n = el, h = 0;
+    while (n && h < 6) {
+      try { var s = getComputedStyle(n); if (s.position === 'fixed' || s.position === 'sticky') return true; if (s.position !== 'static' && (parseInt(s.zIndex, 10) || 0) >= 100) return true; } catch (e) {}
+      n = n.parentElement || (n.getRootNode && n.getRootNode().host); h++;
+    }
+    return false;
+  }
   // coleta raízes (document + shadow roots abertos)
   var roots = [document];
   try { var all = document.querySelectorAll('*'); for (var a = 0; a < all.length; a++) if (all[a].shadowRoot) roots.push(all[a].shadowRoot); } catch (e) {}
 
-  // 1) acha contêineres-banner: bloco visível com texto de cookie, do tamanho de um aviso (não a página toda)
+  // 1) acha contêineres-banner: overlay visível com texto de cookie, do tamanho de um aviso
   var containers = [];
   for (var r = 0; r < roots.length; r++) {
     var blocks; try { blocks = roots[r].querySelectorAll('div,section,aside,dialog,form,footer,[class*="cookie" i],[id*="cookie" i],[class*="consent" i],[id*="consent" i],[role="dialog"],[aria-label*="cookie" i]'); } catch (e) { continue; }
     for (var i = 0; i < blocks.length; i++) {
       var el = blocks[i]; var t = txt(el);
-      if (t.length < 20 || t.length > 1200) continue; // tem texto, mas é um banner (não a página inteira)
+      if (t.length < 20 || t.length > 2500) continue; // tem texto, mas é um banner (não a página inteira)
       if (!COOKIE.test(t)) continue;
       if (!vis(el)) continue;
+      if (!inIframe && !isOverlay(el)) continue; // no frame principal, exige overlay (exclui rodapé)
       containers.push(el);
     }
   }
@@ -117,9 +131,29 @@ function dismissConsentInFrame() {
     return null;
   }
 
+  function take(btn) {
+    try { btn.setAttribute('data-rino-accept', '1'); } catch (e) {}   // marca p/ clique CONFIÁVEL via Playwright
+    try { btn.scrollIntoView({ block: 'center' }); } catch (e) {}
+    try { btn.click(); } catch (e) {}                                  // fallback in-page (untrusted)
+    return label(btn).slice(0, 50);
+  }
   for (var c = 0; c < containers.length; c++) {
     var btn = pickAcceptIn(containers[c]);
-    if (btn) { try { btn.scrollIntoView({ block: 'center' }); } catch (e) {} try { btn.click(); } catch (e) {} return label(btn).slice(0, 50); }
+    if (btn) return take(btn);
+  }
+  // 2) há overlay de cookie, mas o aceite está num contêiner SEPARADO (CMPs como AdOpt): procura
+  //    um botão de ACEITE explícito em qualquer overlay do frame (escopo seguro: só com banner presente).
+  if (containers.length) {
+    var pool = [];
+    for (var r2 = 0; r2 < roots.length; r2++) { var cl; try { cl = roots[r2].querySelectorAll('button,a,summary,[role="button"],input[type="button"],input[type="submit"],[onclick]'); } catch (e) { continue; } for (var z = 0; z < cl.length; z++) pool.push(cl[z]); }
+    var acc2 = [];
+    for (var z2 = 0; z2 < pool.length; z2++) {
+      var e2 = pool[z2]; if (!vis(e2)) continue; var l2 = label(e2);
+      if (!l2 || l2.length > 40 || isReject(l2) || !ACCEPT.test(l2)) continue;
+      if (!inIframe && !isOverlay(e2)) continue;
+      acc2.push(e2);
+    }
+    if (acc2.length) return take(acc2[acc2.length - 1]);
   }
   return null;
 }
@@ -135,9 +169,18 @@ async function acceptConsent(page) {
         try { if (await fr.locator(sel).count()) { if (await clickMaybe(fr, fr.locator(sel), 2500)) { await sleep(700); return true; } } } catch (e) {}
       }
     }
-    // 2) heurística contêiner-primeiro (DOM + shadow + iframes) por frame
+    // 2) heurística contêiner-primeiro (DOM + shadow + iframes) por frame.
+    //    A função marca o botão (data-rino-accept); aqui damos o clique CONFIÁVEL via Playwright
+    //    (alguns CMPs, ex. Mercado Livre, ignoram cliques não-confiáveis/isTrusted).
     for (const fr of page.frames().slice(0, 8)) {
-      try { const hit = await fr.evaluate(dismissConsentInFrame); if (hit) { await sleep(700); return true; } } catch (e) {}
+      let hit = null;
+      try { hit = await fr.evaluate(dismissConsentInFrame); } catch (e) {}
+      if (hit) {
+        try { await fr.locator('[data-rino-accept="1"]').first().click({ timeout: 2500 }); } catch (e) {}
+        try { await fr.evaluate(() => document.querySelectorAll('[data-rino-accept]').forEach((e) => e.removeAttribute('data-rino-accept'))); } catch (e) {}
+        await sleep(700);
+        return true;
+      }
     }
     await sleep(1100);
   }

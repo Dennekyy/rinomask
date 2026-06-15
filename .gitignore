@@ -25,3 +25,6 @@ Thumbs.db
 
 # Token de release (NUNCA versionar)
 .rinomask-release-token
+
+# Artefatos de depuração (HTML de banners etc.)
+debug/
