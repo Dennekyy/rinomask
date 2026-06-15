@@ -153,7 +153,13 @@ async function stop(id) {
   const e = running.get(id);
   if (!e) return { ok: false, error: 'nao esta em execucao' };
   if (e.kind === 'manual') { await killManual(id); if (e.bridge) e.bridge.close(); }
-  else { await e.context.close().catch(() => {}); }
+  else {
+    // Fecha o contexto SEM deixar travar: se o close() demorar (navegador travado), mata o
+    // processo do Camoufox por id (o -profile carrega o id do perfil na linha de comando).
+    await Promise.race([e.context.close().catch(() => {}), new Promise((r) => setTimeout(r, 6000))]);
+    await killManual(id).catch(() => {});
+    if (e.bridge) e.bridge.close();
+  }
   running.delete(id);
   return { ok: true };
 }

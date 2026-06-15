@@ -86,11 +86,23 @@ async function warmProfile(id) {
     const page = await launcher.getPage(id);
     if (!page) { emit('warm:done', { id, error: 'sem página disponível' }); return; }
     emit('warm:start', { id });
-    // Jornada começo→meio→fim direcionada ao nicho do perfil; SEMPRE termina dentro do teto.
-    const r = await cookieRobot.warmUp(page, { niche: prof.mainWebsite, budgetMs: BUDGET, onProgress: (pr) => emit('warm:progress', { id, ...pr }) });
-    const w = await cookieRobot.measureWarmth(page.context(), r.visited);
-    store.setWarmth(id, { ...w, at: new Date().toISOString() });
-    emit('warm:done', { id, visited: r.visited, warmth: w.score });
+    // Jornada começo→meio→fim direcionada ao nicho. Teto ABSOLUTO via Promise.race: o aquecimento
+    // NUNCA passa de HARD, mesmo se algo interno travar (o navegador é fechado no finally).
+    const HARD = BUDGET + 60000;
+    const result = await Promise.race([
+      (async () => {
+        const r = await cookieRobot.warmUp(page, { niche: prof.mainWebsite, budgetMs: BUDGET, onProgress: (pr) => emit('warm:progress', { id, ...pr }) });
+        let w = null; try { w = await cookieRobot.measureWarmth(page.context(), r.visited); } catch (e) {}
+        return { r, w };
+      })(),
+      new Promise((res) => setTimeout(() => res('__timeout__'), HARD)),
+    ]);
+    if (result === '__timeout__') {
+      emit('warm:done', { id, error: 'tempo limite atingido — encerrado' });
+    } else {
+      if (result.w) store.setWarmth(id, { ...result.w, at: new Date().toISOString() });
+      emit('warm:done', { id, visited: result.r.visited, warmth: result.w ? result.w.score : 0 });
+    }
   } catch (e) {
     errorLog.log({ source: 'cookieRobot', message: e && e.message, stack: e && e.stack, context: { id } });
     emit('warm:done', { id, error: e && e.message });
