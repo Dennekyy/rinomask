@@ -744,6 +744,7 @@ function openWarmDialog(target) {
   const useTarget = el('input', { type: 'checkbox' });
   const targetNum = el('input', { type: 'number', value: '70', min: '10', max: '100', style: 'width:74px' });
   const concNum = el('input', { type: 'number', value: '1', min: '1', max: '3', style: 'width:74px' });
+  const showWin = el('input', { type: 'checkbox' }); // por padrão OFF → roda em segundo plano
   modal({
     title: many ? `Aquecer ${ids.length} perfis` : 'Aquecer perfil',
     body: [
@@ -751,16 +752,18 @@ function openWarmDialog(target) {
       segRow,
       el('label', { style: 'display:flex;gap:8px;align-items:center;margin-top:12px' }, useTarget, el('span', {}, 'Aquecer até a maturidade atingir'), targetNum, el('span', { class: 'hint' }, '/100 (ou o teto de tempo)')),
       many ? el('label', { style: 'display:flex;gap:8px;align-items:center;margin-top:12px' }, el('span', {}, 'Navegadores em paralelo (1–3):'), concNum) : null,
-      el('p', { class: 'hint', style: 'margin-top:12px' }, 'O aquecimento sempre termina dentro do teto de tempo e fecha o navegador ao concluir.'),
+      el('label', { style: 'display:flex;gap:8px;align-items:center;margin-top:12px' }, showWin, el('span', {}, 'Mostrar a janela do navegador (acompanhar)')),
+      el('p', { class: 'hint', style: 'margin-top:12px' }, 'Roda em segundo plano (sem janela) por padrão. Sempre termina dentro do teto de tempo e fecha o navegador ao concluir.'),
     ],
     foot: [
       el('button', { class: 'ghost', onClick: closeModal }, 'Cancelar'),
       el('button', { class: 'primary', onClick: () => {
         const targetScore = useTarget.checked ? Math.max(10, Math.min(100, Number(targetNum.value) || 70)) : null;
-        if (many) inv('cookieRobot.runMany', { ids, intensity, targetScore, concurrency: Math.max(1, Math.min(3, Number(concNum.value) || 1)) });
-        else inv('cookieRobot.run', { id: ids[0], intensity, targetScore });
+        const show = showWin.checked;
+        if (many) inv('cookieRobot.runMany', { ids, intensity, targetScore, show, concurrency: Math.max(1, Math.min(3, Number(concNum.value) || 1)) });
+        else inv('cookieRobot.run', { id: ids[0], intensity, targetScore, show });
         closeModal();
-        toast('🍪 Aquecimento iniciado…');
+        toast(show ? '🍪 Aquecimento iniciado…' : '🍪 Aquecendo em segundo plano…');
       } }, 'Aquecer'),
     ],
   });

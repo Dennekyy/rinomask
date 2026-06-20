@@ -65,8 +65,9 @@ async function ensureLaunched(id) {
   return launcher.getPage(id); // null se o perfil estiver aberto no modo manual
 }
 
-// Aquece um perfil: abre o navegador VISÍVEL, executa o Cookie Robot, mede a maturidade
-// (cookies/domínios/sites) e FECHA o navegador ao terminar. Headless só em testes.
+// Aquece um perfil EM SEGUNDO PLANO (headless, sem janela) por padrão — o usuário não precisa
+// abrir nada. opts.show abre a janela do navegador para acompanhar. Executa o Cookie Robot,
+// mede a maturidade (cookies/domínios/sites) e FECHA o navegador ao terminar.
 async function warmProfile(id, opts) {
   const prof = store.getProfile(id);
   if (!prof) { emit('warm:done', { id, error: 'perfil não encontrado' }); return; }
@@ -81,7 +82,9 @@ async function warmProfile(id, opts) {
   let killer = null;
   try {
     if (!wasRunning) {
-      await launcher.launchAutomation(prof, { headless: process.env.RINOMASK_HEADLESS === '1' });
+      // Segundo plano por padrão (sem janela). opts.show → janela visível para acompanhar.
+      const headless = !(opts && opts.show);
+      await launcher.launchAutomation(prof, { headless });
       launchedByRobot = true;
       store.markLaunched(id);
       notifyChanged();
@@ -127,10 +130,10 @@ async function warmProfile(id, opts) {
 
 // Aquece vários perfis (Fase 5): pool de concorrência configurável (default 1, teto 3) para
 // equilibrar velocidade × memória — cada perfil abre seu próprio navegador.
-async function runManyWarm({ ids, intensity, targetScore, concurrency } = {}) {
+async function runManyWarm({ ids, intensity, targetScore, concurrency, show } = {}) {
   const queue = Array.isArray(ids) ? ids.slice() : [];
   const conc = Math.max(1, Math.min(3, Number(concurrency) || 1));
-  const opts = { intensity, targetScore };
+  const opts = { intensity, targetScore, show };
   const worker = async () => { while (queue.length) { const id = queue.shift(); await warmProfile(id, opts); } };
   await Promise.all(Array.from({ length: Math.min(conc, queue.length) }, () => worker()));
 }
@@ -285,7 +288,7 @@ const handlers = {
   'tags.delete': (p) => { store.deleteTag(p.id); notifyChanged(); return { ok: true }; },
 
   // --- cookie robot (aquecimento) ---
-  'cookieRobot.run': (p) => { warmProfile(p.id, { intensity: p && p.intensity, targetScore: p && p.targetScore }); return { started: true }; },
+  'cookieRobot.run': (p) => { warmProfile(p.id, { intensity: p && p.intensity, targetScore: p && p.targetScore, show: p && p.show }); return { started: true }; },
   'cookieRobot.runMany': (p) => { runManyWarm(p || {}); return { started: true }; },
 
   // --- trust score (auto-teste de indetectabilidade) ---
