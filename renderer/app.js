@@ -273,7 +273,29 @@ function visibleProfiles() {
   if (q) list = list.filter((p) => p.name.toLowerCase().includes(q) || (p.notes || '').toLowerCase().includes(q));
   if (state.filterStatus) list = list.filter((p) => p.status === state.filterStatus);
   if (state.filterTag) list = list.filter((p) => (p.tags || []).includes(state.filterTag));
-  return list.slice().sort((a, b) => (b.pinned - a.pinned) || a.name.localeCompare(b.name));
+  return list.slice().sort((a, b) => (b.pinned - a.pinned) || ((a.order ?? 0) - (b.order ?? 0)) || a.name.localeCompare(b.name));
+}
+
+// Arraste para reordenar (só visual): clica-segura a alça ≡ e move a linha ↑/↓. Ao soltar,
+// persiste a nova sequência (profiles.reorder) — o re-render reaplica a ordem salva.
+function startRowDrag(e, tr) {
+  e.preventDefault(); e.stopPropagation();
+  const tbody = tr.parentElement; if (!tbody) return;
+  tr.classList.add('dragging');
+  const onMove = (ev) => {
+    const rows = [...tbody.querySelectorAll('tr')].filter((r) => r !== tr);
+    const after = rows.find((r) => ev.clientY < r.getBoundingClientRect().top + r.offsetHeight / 2);
+    if (after) tbody.insertBefore(tr, after); else tbody.appendChild(tr);
+  };
+  const onUp = async () => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    tr.classList.remove('dragging');
+    const orderedIds = [...tbody.querySelectorAll('tr')].map((r) => r.dataset.id).filter(Boolean);
+    await inv('profiles.reorder', { orderedIds });
+  };
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
 }
 
 /* ============================== Render ============================== */
@@ -351,12 +373,14 @@ function renderTable() {
     const st = statusById(p.status);
     const checked = state.selected.has(p.id);
     const tr = el('tr', { class: checked ? 'sel' : '' });
+    tr.dataset.id = p.id;
 
     tr.append(el('td', {}, el('input', { type: 'checkbox', checked: checked ? '' : null, onChange: (e) => { e.target.checked ? state.selected.add(p.id) : state.selected.delete(p.id); render(); } })));
     tr.append(el('td', {}, el('span', { class: 'run-led' + (p.running ? ' on' : ''), title: p.running ? 'aberto' : 'parado' })));
 
     tr.append(el('td', {},
       el('div', { class: 'pname' },
+        state.view === 'trash' ? null : el('span', { class: 'grip', title: 'Arraste para reordenar', onMousedown: (e) => startRowDrag(e, tr) }, '⠿'),
         profileAvatar(p, st),
         p.pinned ? el('span', { class: 'pin', title: 'fixado' }, svg('pin', 13)) : null,
         el('div', {},
@@ -600,11 +624,11 @@ function openCookiesModal(p) {
   modal({
     title: `Cookies — ${p.name}`,
     body: el('div', {},
-      el('p', { class: 'hint' }, 'Abra o perfil antes de exportar/importar. Importar exige formato de cookies do Playwright/Chrome.'),
+      el('p', { class: 'hint' }, 'Funciona com o perfil FECHADO — os cookies são injetados direto no navegador (cookies.sqlite) e valem na próxima abertura. Se estiver aberto em modo manual, feche antes. Formato: cookies do Playwright/Chrome.'),
       area),
     foot: [
-      el('button', { class: 'ghost', onClick: async () => { const r = await inv('profiles.exportCookies', { id: p.id }); if (!r.ok) return toast(r.error); area.value = JSON.stringify(r.cookies, null, 2); toast(`${r.cookies.length} cookies`); } }, '⬇ Exportar'),
-      el('button', { class: 'primary', onClick: async () => { try { const r = await inv('profiles.importCookies', { id: p.id, cookies: JSON.parse(area.value) }); toast(r.ok ? 'Importado' : 'Erro: ' + r.error); } catch (e) { toast('JSON inválido'); } } }, '⬆ Importar'),
+      el('button', { class: 'ghost', onClick: async () => { toast('Lendo cookies…'); const r = await inv('profiles.exportCookies', { id: p.id }); if (!r.ok) return toast('Erro: ' + r.error); area.value = JSON.stringify(r.cookies, null, 2); toast(`${r.cookies.length} cookie(s) exportado(s)`); } }, '⬇ Exportar'),
+      el('button', { class: 'primary', onClick: async () => { let parsed; try { parsed = JSON.parse(area.value); } catch (e) { return toast('JSON inválido'); } toast('Injetando cookies…'); const r = await inv('profiles.importCookies', { id: p.id, cookies: parsed }); toast(r.ok ? `✓ ${r.count} cookie(s) adicionados` : 'Erro: ' + r.error); } }, '⬆ Importar'),
     ],
   });
 }

@@ -172,16 +172,49 @@ async function stopAll() {
   }
 }
 
-// --- Cookies (precisa de sessão Playwright) ---
-async function exportCookies(id) {
-  const ctx = getContext(id);
-  if (!ctx) return { ok: false, error: 'cookies disponíveis só durante uma sessão de automação (não no modo manual)' };
-  return { ok: true, cookies: await ctx.cookies() };
+// --- Cookies ---
+// Abre um contexto persistente HEADLESS transitório sobre o userDataDir do perfil, roda `fn`
+// (ler/escrever cookies) e fecha — exatamente como uma injeção de cookies em perfil fechado.
+// Os cookies vão para o cookies.sqlite do perfil e ficam lá quando o usuário abrir depois.
+async function withTransientContext(profile, fn) {
+  const fpData = await ensureFingerprint(profile);
+  const launchOpts = await camoufox.buildLaunchOptions(profile, profile.resolvedProxy, fpData, { headless: true, display: displayInfo, clamp: true });
+  const context = await firefox.launchPersistentContext(profile.userDataDir, launchOpts);
+  try { return await fn(context); }
+  finally {
+    const closed = await Promise.race([context.close().then(() => true).catch(() => false), new Promise((r) => setTimeout(() => r(false), 6000))]);
+    if (!closed) await killManual(profile.id).catch(() => {}); // só força se o close travar
+  }
 }
-async function importCookies(id, cookies) {
-  const ctx = getContext(id);
-  if (!ctx) return { ok: false, error: 'abra via automação para importar cookies' };
-  try { await ctx.addCookies(Array.isArray(cookies) ? cookies : JSON.parse(cookies)); return { ok: true }; }
+
+// Exporta os cookies do perfil. Aberto em automação → contexto vivo; aberto MANUAL → o profile
+// está travado pelo Firefox (peça para fechar); FECHADO → contexto transitório.
+async function exportCookies(profile) {
+  if (!profile || !profile.id) return { ok: false, error: 'perfil não encontrado' };
+  if (isRunning(profile.id)) {
+    const ctx = getContext(profile.id);
+    if (!ctx) return { ok: false, error: 'feche o navegador (aberto em modo manual) para exportar os cookies' };
+    return { ok: true, cookies: await ctx.cookies() };
+  }
+  try { return { ok: true, cookies: await withTransientContext(profile, (ctx) => ctx.cookies()) }; }
+  catch (e) { return { ok: false, error: e.message }; }
+}
+
+// Adiciona/injeta cookies no perfil. Funciona com o perfil FECHADO (caso comum): grava no
+// cookies.sqlite e o navegador passa a usá-los na próxima abertura, como qualquer injeção.
+async function importCookies(profile, cookies) {
+  if (!profile || !profile.id) return { ok: false, error: 'perfil não encontrado' };
+  let parsed;
+  try { parsed = Array.isArray(cookies) ? cookies : JSON.parse(cookies); }
+  catch (e) { return { ok: false, error: 'JSON de cookies inválido' }; }
+  if (!Array.isArray(parsed) || !parsed.length) return { ok: false, error: 'nenhum cookie para importar' };
+  if (isRunning(profile.id)) {
+    const ctx = getContext(profile.id);
+    if (!ctx) return { ok: false, error: 'feche o navegador (aberto em modo manual) para adicionar cookies' };
+    try { await ctx.addCookies(parsed); return { ok: true, count: parsed.length }; }
+    catch (e) { return { ok: false, error: e.message }; }
+  }
+  try { await withTransientContext(profile, (ctx) => ctx.addCookies(parsed)); return { ok: true, count: parsed.length }; }
   catch (e) { return { ok: false, error: e.message }; }
 }
 

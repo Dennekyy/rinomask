@@ -207,6 +207,11 @@ tbody tr { transition: background 0.12s; }
 tbody tr:hover { background: var(--surface); }
 tbody tr.sel { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
 .pname { display: flex; align-items: center; gap: 10px; }
+.pname .grip { cursor: grab; color: var(--muted-2); font-size: 13px; line-height: 1; letter-spacing: -2px; padding: 0 2px; user-select: none; opacity: 0; transition: opacity 0.12s; }
+tr:hover .pname .grip { opacity: 1; }
+.pname .grip:hover { color: var(--muted); }
+.pname .grip:active { cursor: grabbing; }
+#rows tr.dragging { opacity: 0.5; background: var(--surface-2); }
 .pname .pin { color: var(--amber); display: grid; place-items: center; }
 .pname .pin svg { width: 13px; height: 13px; }
 .pname .nm { font-weight: 600; letter-spacing: -0.1px; }

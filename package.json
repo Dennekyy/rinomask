@@ -1,7 +1,7 @@
 {
   "name": "rinomask",
   "productName": "RinoMask",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "RinoMask — navegador antidetect: gerenciamento visual de perfis, fingerprints avancadas, biblioteca de proxies, status/tags/pastas, acoes em massa, cookies, lixeira e sincronizador.",
   "author": "Dennekyy",
   "license": "UNLICENSED",
@@ -22,6 +22,7 @@
     "test:launch": "node scripts/_enode.js scripts/test-launch.js",
     "test:warm": "node scripts/_enode.js scripts/test-warm.js",
     "test:warm-content": "node scripts/test-warm-content.js",
+    "test:cookies": "node scripts/_enode.js scripts/test-cookies.js",
     "test:proxy": "node scripts/_enode.js scripts/test-proxy.js",
     "test:vault": "node scripts/test-vault.js",
     "test:ui:vault": "node scripts/test-ui-vault.js",

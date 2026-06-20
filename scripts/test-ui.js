@@ -85,6 +85,23 @@ const root = path.join(__dirname, '..');
     check('clones criados (3 linhas no total)', (await win.locator('#rows tr').count()) === 3, (await win.locator('#rows tr').count()) + ' linhas');
   });
 
+  console.log('\n[3b] Reordenar por arraste (alça ≡):');
+  await step('arrastar linha', async () => {
+    const namesBefore = await win.$$eval('#rows tr .nm', (els) => els.map((e) => e.textContent.trim()));
+    const g = await win.locator('#rows tr .grip').first().boundingBox();
+    const r1 = await win.locator('#rows tr').nth(1).boundingBox();
+    await win.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+    await win.mouse.down();
+    await win.mouse.move(r1.x + r1.width / 2, r1.y + r1.height + 6, { steps: 8 });
+    await win.mouse.up();
+    await win.waitForTimeout(500);
+    const orders = await win.evaluate(async () => {
+      const list = await window.api.invoke('profiles.list');
+      const m = {}; list.forEach((p) => { m[p.name] = p.order; }); return m;
+    });
+    check('arraste move o 1º perfil p/ baixo e persiste (order)', orders[namesBefore[0]] > orders[namesBefore[1]], `${namesBefore[0]}=${orders[namesBefore[0]]} vs ${namesBefore[1]}=${orders[namesBefore[1]]}`);
+  });
+
   console.log('\n[4] Status / Tags / Pastas / Proxies (sidebar):');
   await step('status', async () => {
     await win.locator('#nav .nav-item', { hasText: 'Status' }).click();

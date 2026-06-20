@@ -212,6 +212,7 @@ const handlers = {
   'profiles.update': (p) => { const r = store.updateProfile(p.id, p.patch); notifyChanged(); return r; },
   'profiles.clone': (p) => { const r = store.cloneProfile(p.id, p.count, p.randomize); notifyChanged(); return r; },
   'profiles.pin': (p) => { const r = store.updateProfile(p.id, { pinned: p.pinned }); notifyChanged(); return r; },
+  'profiles.reorder': (p) => { store.reorderProfiles(p.orderedIds); notifyChanged(); return { ok: true }; },
 
   'profiles.trash': (p) => { store.trashProfiles(p.ids); notifyChanged(); return { ok: true }; },
   'profiles.restore': (p) => { store.restoreProfiles(p.ids); notifyChanged(); return { ok: true }; },
@@ -259,9 +260,9 @@ const handlers = {
     return { ok: true };
   },
 
-  // --- cookies ---
-  'profiles.exportCookies': (p) => launcher.exportCookies(p.id),
-  'profiles.importCookies': (p) => launcher.importCookies(p.id, p.cookies),
+  // --- cookies (funciona com o perfil fechado: injeta no userDataDir via contexto transitório) ---
+  'profiles.exportCookies': (p) => launcher.exportCookies(store.getProfile(p.id)),
+  'profiles.importCookies': (p) => launcher.importCookies(store.getProfile(p.id), p.cookies),
 
   // --- proxies ---
   'proxies.list': () => store.listProxies(),

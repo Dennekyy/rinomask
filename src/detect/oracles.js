@@ -14,28 +14,48 @@ async function settle(page, signalRegex, ms = 45000) {
 async function bodyText(page) { try { return await page.evaluate(() => document.body.innerText || ''); } catch (e) { return ''; } }
 async function go(page, url) { await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 }); }
 
-// CreepJS — referência aberta do mercado: trust score, "lies", headless/stealth.
+// CreepJS — referência aberta do mercado. A versão atual NÃO mostra mais "trust score: NN%";
+// exibe uma NOTA (grade A–F) + nível de confiança ("high/moderate/low") e ratings de
+// headless/stealth. Lemos o grade pela CLASSE do elemento (`grade-A`…`grade-F`) e normalizamos
+// para 0–100; o texto "trust score" antigo desapareceu (por isso o oráculo dava "indisponível").
+const CREEPJS_GRADE = { A: 95, B: 80, C: 65, D: 50, E: 40, F: 25 };
 async function creepjs(page) {
   const url = 'https://abrahamjuliot.github.io/creepjs/';
   const r = { name: 'CreepJS', url, ok: false, score: null, verdict: '', raw: '' };
   try {
     await go(page, url);
-    // CreepJS renderiza por seções (lazy) e é lento: rola pra disparar e espera o VALOR no DOM.
-    for (let i = 0; i < 6; i++) { try { await page.evaluate(() => window.scrollBy(0, document.body.scrollHeight / 4)); } catch (e) {} await page.waitForTimeout(2500); }
-    await page.waitForFunction(() => /trust score[\s\S]{0,80}?\d{1,3}\s*%/i.test(document.body.textContent || ''), null, { timeout: 60000 }).catch(() => {});
-    await page.waitForTimeout(2500);
-    const t = await page.evaluate(() => document.body.textContent || '').catch(() => '');
-    r.raw = (t.match(/trust score[\s\S]{0,70}/i) || [''])[0].replace(/\s+/g, ' ').trim().slice(0, 120);
-    const score = t.match(/trust score[\s\S]{0,80}?(\d{1,3}(?:\.\d+)?)\s*%/i);
-    const lies = t.match(/(\d+)\s+lie/i);
-    if (score) r.score = Math.round(parseFloat(score[1]));
-    r.verdict = (r.score != null ? r.score + '%' : '?') + (lies ? ` · ${lies[1]} mentira(s)` : '');
-    r.ok = r.score != null || !!lies;
-    if (process.env.DETECT_DEBUG === '1') {
-      const around = (t.match(/[\s\S]{0,60}trust score[\s\S]{0,120}/i) || [''])[0].replace(/\s+/g, ' ').trim();
-      const pcts = (t.match(/\d{1,3}\s*%/g) || []).slice(0, 8).join(' ');
-      r.debug = `len=${t.length} | around="${around}" | pcts=[${pcts}]`;
+    // Computa por seções (lazy/workers): rola pra disparar e espera o GRADE aparecer no DOM.
+    for (let i = 0; i < 5; i++) { try { await page.evaluate(() => window.scrollBy(0, document.body.scrollHeight / 4)); } catch (e) {} await page.waitForTimeout(2000); }
+    await page.waitForFunction(() => {
+      const g = document.querySelector('[class*="grade-"]');
+      return !!(g && (g.textContent || '').trim());
+    }, null, { timeout: 45000 }).catch(() => {});
+    const d = await page.evaluate(() => {
+      const norm = (s) => (s || '').replace(/\s+/g, ' ').trim();
+      const g = document.querySelector('[class*="grade-"]');
+      const cls = g ? ((g.className && g.className.baseVal !== undefined ? g.className.baseVal : g.className) || '') : '';
+      const rate = (sel) => { const e = document.querySelector(sel); const m = e && norm(e.textContent).match(/(\d{1,3})\s*%/); return m ? parseInt(m[1], 10) : null; };
+      return {
+        letter: (cls.match(/grade-([A-F])/i) || [])[1] || null,
+        level: g ? norm(g.textContent).slice(0, 24) : '',
+        headless: rate('.headless-rating'), stealth: rate('.stealth-rating'),
+      };
+    }).catch(() => ({}));
+    const letter = d.letter && d.letter.toUpperCase();
+    if (letter && CREEPJS_GRADE[letter] != null) { r.score = CREEPJS_GRADE[letter]; r.ok = true; }
+    else if (d.level) { // fallback pelo nível textual, se a classe mudar
+      const lv = d.level.toLowerCase();
+      if (/high/.test(lv)) r.score = 90; else if (/moder/.test(lv)) r.score = 65; else if (/low/.test(lv)) r.score = 35;
+      if (r.score != null) r.ok = true;
     }
+    const parts = [];
+    if (letter) parts.push('grade ' + letter);
+    if (d.level) parts.push(d.level);
+    if (typeof d.headless === 'number') parts.push(`headless ${d.headless}%`);
+    if (typeof d.stealth === 'number') parts.push(`stealth ${d.stealth}%`);
+    r.verdict = parts.join(' · ');
+    r.raw = r.verdict || '(grade não localizado)';
+    if (process.env.DETECT_DEBUG === '1') r.debug = JSON.stringify(d);
   } catch (e) { r.error = e.message; }
   return r;
 }

@@ -65,6 +65,13 @@ function normalizeDb() {
   db.folders = db.folders || [];
   db.tags = db.tags || [];
   db.settings = db.settings || {};
+  // Backfill da ordem manual (arraste): perfis sem `order` recebem um índice estável pela ordem
+  // alfabética atual, para o 1º render após a atualização não "pular". Depois o arraste manda.
+  const missing = db.profiles.filter((p) => typeof p.order !== 'number');
+  if (missing.length) {
+    let base = db.profiles.reduce((m, p) => (typeof p.order === 'number' && p.order > m ? p.order : m), -1);
+    missing.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))).forEach((p) => { p.order = ++base; });
+  }
 }
 
 // Decide o estado inicial: se há vault, fica TRANCADO até unlock; senão, carrega plaintext.
@@ -203,6 +210,7 @@ function createProfile(input = {}) {
     tags: input.tags || [],
     folderId: input.folderId || null,
     pinned: false,
+    order: db.profiles.reduce((m, p) => (typeof p.order === 'number' && p.order > m ? p.order : m), -1) + 1, // vai para o fim da lista
     mainWebsite: input.mainWebsite || null,
     startUrl: input.startUrl || '',
     proxyId: input.proxyId || null,
@@ -274,6 +282,20 @@ function setDetectReport(id, data) {
 function setWarmReport(id, data) {
   const p = db.profiles.find((x) => x.id === id);
   if (p) { p.warmReport = data; save(); }
+}
+
+// Reordena perfis pelo arraste (Fase visual). Recebe a sequência de ids VISÍVEL na nova ordem e
+// a aplica sobre a ordem global, preservando os perfis ocultos (filtros) nos seus lugares.
+function reorderProfiles(orderedIds) {
+  if (!Array.isArray(orderedIds) || !orderedIds.length) return;
+  const want = orderedIds.filter((id) => db.profiles.some((p) => p.id === id && !p.deletedAt));
+  const wantSet = new Set(want);
+  const all = db.profiles.filter((p) => !p.deletedAt).slice()
+    .sort((a, b) => ((a.order ?? 0) - (b.order ?? 0)) || String(a.name || '').localeCompare(String(b.name || '')));
+  let qi = 0;
+  const finalSeq = all.map((p) => (wantSet.has(p.id) ? want[qi++] : p.id)); // troca só os slots visíveis
+  finalSeq.forEach((id, i) => { const p = db.profiles.find((x) => x.id === id); if (p) p.order = i * 10; });
+  save();
 }
 
 // Histórico de domínios recém-aquecidos (Fase 3): usado para DIVERSIFICAR a próxima execução.
@@ -505,7 +527,7 @@ function saveSettings(patch) { Object.assign(db.settings, patch); save(); }
 module.exports = {
   setDataDir, userDataDir,
   listProfiles, getProfile, createProfile, updateProfile, markLaunched, setFingerprintData, setTrustScore, setWarmth, setDetectReport, setWarmReport, setWarmVisited,
-  cloneProfile, bulkSetStatus, bulkAddTag, bulkRemoveTag, bulkSetFolder, bulkSetProxy,
+  cloneProfile, reorderProfiles, bulkSetStatus, bulkAddTag, bulkRemoveTag, bulkSetFolder, bulkSetProxy,
   trashProfiles, restoreProfiles, deleteProfilesForever, resolveProxy,
   listProxies, createProxy, updateProxyMeta, deleteProxy, importProxiesBulk,
   listFolders, createFolder, updateFolder, deleteFolder,
