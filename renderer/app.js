@@ -64,6 +64,133 @@ function svg(name, size = 16) {
   return s;
 }
 
+// Iniciais do nome (até 2 letras) — usadas como avatar quando o perfil não tem foto.
+function initials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  if (parts.length === 1) return parts[0].slice(0, 2);
+  return parts[0][0] + parts[parts.length - 1][0];
+}
+
+// Abre um recortador circular: o usuário arrasta para posicionar e dá zoom (roda do
+// mouse ou barra). Resolve com um data URL quadrado leve (256px, JPEG) já enquadrado,
+// ou null se cancelar. CSP permite `img-src 'self' data:`, então data URLs funcionam.
+function openAvatarCropper(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onerror = () => { toast('Falha ao ler a imagem'); resolve(null); };
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => { toast('Imagem inválida'); resolve(null); };
+      img.onload = () => mountAvatarCropper(img, resolve);
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// Camada própria (não usa modal(), para não fechar o editor por baixo).
+function mountAvatarCropper(img, resolve) {
+  const V = 288;   // viewport de exibição (px CSS)
+  const OUT = 256; // resolução de saída
+  const canvas = el('canvas', { class: 'cropper-canvas' });
+  canvas.width = V; canvas.height = V;
+  const ctx = canvas.getContext('2d');
+
+  const coverScale = Math.max(V / img.width, V / img.height); // mínimo: cobre o círculo
+  const maxScale = coverScale * 5;
+  let scale = coverScale;
+  let ox = (V - img.width * scale) / 2;
+  let oy = (V - img.height * scale) / 2;
+
+  const clampOffset = () => {
+    const w = img.width * scale, h = img.height * scale;
+    ox = Math.min(0, Math.max(V - w, ox));
+    oy = Math.min(0, Math.max(V - h, oy));
+  };
+
+  const draw = () => {
+    clampOffset();
+    ctx.clearRect(0, 0, V, V);
+    ctx.drawImage(img, ox, oy, img.width * scale, img.height * scale);
+    // escurece tudo fora do círculo (rect menos círculo, via evenodd)
+    ctx.fillStyle = 'rgba(15,15,15,0.6)';
+    ctx.beginPath();
+    ctx.rect(0, 0, V, V);
+    ctx.arc(V / 2, V / 2, V / 2 - 1, 0, Math.PI * 2);
+    ctx.fill('evenodd');
+    // anel-guia
+    ctx.beginPath();
+    ctx.arc(V / 2, V / 2, V / 2 - 1, 0, Math.PI * 2);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.stroke();
+  };
+
+  const zoom = el('input', { type: 'range', min: '1', max: '5', step: '0.01', value: '1', class: 'cropper-zoom' });
+  // Zoom mantendo fixo o ponto (px,py) da viewport sob o cursor/centro.
+  const zoomAt = (px, py, factor) => {
+    const ns = Math.max(coverScale, Math.min(maxScale, scale * factor));
+    if (ns === scale) return;
+    const ix = (px - ox) / scale, iy = (py - oy) / scale;
+    scale = ns;
+    ox = px - ix * scale; oy = py - iy * scale;
+    zoom.value = (scale / coverScale).toFixed(2);
+    draw();
+  };
+  zoom.addEventListener('input', () => zoomAt(V / 2, V / 2, (coverScale * parseFloat(zoom.value)) / scale));
+
+  // Arrastar com Pointer Events + capture: funciona ao sair do canvas, sem listeners no window.
+  let dragging = false, lx = 0, ly = 0;
+  canvas.addEventListener('pointerdown', (e) => { dragging = true; lx = e.clientX; ly = e.clientY; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', (e) => { if (!dragging) return; ox += e.clientX - lx; oy += e.clientY - ly; lx = e.clientX; ly = e.clientY; draw(); });
+  const endDrag = () => { dragging = false; };
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const r = canvas.getBoundingClientRect();
+    zoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.12 : 1 / 1.12);
+  }, { passive: false });
+
+  // Renderiza a área visível (quadrado da viewport) na resolução de saída.
+  const crop = () => {
+    const out = document.createElement('canvas');
+    out.width = OUT; out.height = OUT;
+    const k = OUT / V;
+    out.getContext('2d').drawImage(img, ox * k, oy * k, img.width * scale * k, img.height * scale * k);
+    return out.toDataURL('image/jpeg', 0.9);
+  };
+
+  let done = false;
+  const overlay = el('div', { class: 'modal-root cropper-root show' });
+  const finish = (val) => { if (done) return; done = true; overlay.remove(); resolve(val); };
+  overlay.append(
+    el('div', { class: 'scrim', onClick: () => finish(null) }),
+    el('div', { class: 'modal cropper-modal' },
+      el('div', { class: 'modal-head' },
+        el('h3', {}, 'Ajustar foto'),
+        el('button', { class: 'icon', type: 'button', onClick: () => finish(null) }, svg('close'))),
+      el('div', { class: 'modal-body cropper-body' },
+        el('div', { class: 'cropper-stage' }, canvas),
+        el('div', { class: 'cropper-controls' }, el('span', { class: 'cropper-z' }, '–'), zoom, el('span', { class: 'cropper-z' }, '+')),
+        el('p', { class: 'hint', style: 'text-align:center' }, 'Arraste para posicionar · use a roda do mouse ou a barra para dar zoom.')),
+      el('div', { class: 'modal-foot' },
+        el('button', { class: 'ghost', type: 'button', onClick: () => finish(null) }, 'Cancelar'),
+        el('button', { class: 'primary', type: 'button', onClick: () => finish(crop()) }, 'Usar foto'))));
+  document.body.append(overlay);
+  draw();
+}
+
+// Avatar do perfil para a lista: foto (se houver) ou iniciais, com o status como badge.
+function profileAvatar(p, st) {
+  const wrap = el('div', { class: 'pavatar-wrap' });
+  if (p.avatar) wrap.append(el('img', { class: 'pavatar', src: p.avatar, alt: '' }));
+  else wrap.append(el('span', { class: 'pavatar ph' }, initials(p.name) || '?'));
+  wrap.append(el('span', { class: 'statusdot badge', style: `background:${st.color}`, title: st.name }));
+  return wrap;
+}
+
 function toast(msg) {
   const t = $('#toast');
   if (!t) return; // defensivo: nunca lançar a partir do handler global de erros
@@ -230,12 +357,12 @@ function renderTable() {
 
     tr.append(el('td', {},
       el('div', { class: 'pname' },
-        el('span', { class: 'statusdot', style: `background:${st.color}`, title: st.name }),
+        profileAvatar(p, st),
         p.pinned ? el('span', { class: 'pin', title: 'fixado' }, svg('pin', 13)) : null,
         el('div', {},
           el('div', { class: 'nm' }, p.name,
             p.trustScore ? el('span', { class: 'trust', style: `color:${trustColor(p.trustScore.score)}`, title: 'Trust score — indetectabilidade da fingerprint' }, ` 🛡${p.trustScore.score}`) : null,
-            p.warmth ? el('span', { class: 'trust', style: `color:${trustColor(p.warmth.score)}`, title: `Maturidade do perfil — ${p.warmth.cookies} cookies · ${p.warmth.domains} domínios · ${p.warmth.visited} sites` }, ` 🍪${p.warmth.score}`) : null),
+            p.warmth ? el('span', { class: 'trust', style: `color:${trustColor(p.warmth.score)}${p.warmReport ? ';cursor:pointer' : ''}`, title: warmTooltip(p.warmth, !!p.warmReport), onClick: p.warmReport ? (e) => { e.stopPropagation(); openWarmReport(p.warmReport); } : null }, ` 🍪${p.warmth.score}`) : null),
           el('div', { class: 'sub' }, `${st.name}${p.notes ? ' · ' + p.notes.slice(0, 40) : ''}`)))));
 
     tr.append(el('td', {}, ...(p.tags || []).map((tid) => {
@@ -291,7 +418,7 @@ function renderBulkBar() {
   bar.append(ddButton('folder', 'Pasta', [{ label: '— Sem pasta —', onClick: async () => { await inv('profiles.setFolder', { ids, folderId: null }); } }, ...state.meta.folders.map((f) => ({ label: f.name, onClick: async () => { await inv('profiles.setFolder', { ids, folderId: f.id }); } }))]));
   bar.append(ddButton('globe', 'Proxy', [{ label: '— Remover proxy —', onClick: async () => { await inv('profiles.setProxy', { ids, proxyRef: { proxyId: null, proxy: null } }); } }, ...state.meta.proxies.map((px) => ({ label: `${px.name}`, onClick: async () => { await inv('profiles.setProxy', { ids, proxyRef: { proxyId: px.id } }); toast('Proxy atribuído'); } }))]));
 
-  bar.append(el('button', { class: 'sm', onClick: async () => { await inv('cookieRobot.runMany', { ids }); toast('Aquecimento iniciado…'); } }, svg('flame', 14), 'Aquecer'));
+  bar.append(el('button', { class: 'sm', onClick: () => openWarmDialog({ ids }) }, svg('flame', 14), 'Aquecer'));
   bar.append(el('div', { class: 'spacer', style: 'flex:1' }));
   bar.append(el('button', { class: 'sm', onClick: () => startSync(ids) }, svg('link', 14), 'Sincronizar'));
   bar.append(el('button', { class: 'sm danger', onClick: async () => { await inv('profiles.trash', { ids }); state.selected.clear(); toast('Movido(s) para a lixeira'); } }, svg('trash', 14), 'Excluir'));
@@ -346,7 +473,8 @@ function openRowMenu(e, p) {
   ctx.append(it('edit', 'Editar', () => openEditor(p)));
   ctx.append(it('copy', 'Clonar…', () => openCloneModal(p)));
   ctx.append(it('cookie', 'Cookies…', () => openCookiesModal(p)));
-  ctx.append(it('flame', 'Aquecer (Cookie Robot)', () => { inv('cookieRobot.run', { id: p.id }); toast('Aquecimento iniciado…'); }));
+  ctx.append(it('flame', 'Aquecer (Cookie Robot)', () => openWarmDialog({ id: p.id })));
+  if (p.warmReport) ctx.append(it('flame', 'Relatório de aquecimento', () => openWarmReport(p.warmReport)));
   ctx.append(it('shield', 'Testar fingerprint (trust score)', () => runTrust(p)));
   ctx.append(it('alert', 'Auditoria de detecção (oráculos)', () => { inv('detect.run', { id: p.id }); toast('🔎 Auditoria iniciada (abre o navegador, ~1-3 min)…'); }));
   ctx.append(it('pin', p.pinned ? 'Desafixar' : 'Fixar no topo', async () => { await inv('profiles.pin', { id: p.id, pinned: !p.pinned }); }));
@@ -530,6 +658,90 @@ function openDetectReport(rep) {
   });
 }
 
+// Tooltip do selo 🍪 com o breakdown da maturidade (v2: 1st/3rd-party, persistente, TLDs).
+function warmTooltip(w, hasReport) {
+  const parts = [`Maturidade ${w.score}/100`, `${w.cookies} cookies`, `${w.domains} domínios`];
+  if (typeof w.thirdParty === 'number') parts.push(`${w.thirdParty} cross-site`);
+  if (typeof w.persistent === 'number') parts.push(`${w.persistent} persistentes`);
+  if (typeof w.tlds === 'number') parts.push(`${w.tlds} TLDs`);
+  parts.push(`${w.visited} etapas`);
+  if (hasReport) parts.push('clique para o relatório');
+  return parts.join(' · ');
+}
+
+// Relatório de aquecimento (maturidade v2 + jornada + consentimentos + domínios visitados).
+function openWarmReport(rep) {
+  if (!rep) return toast('Sem relatório de aquecimento ainda — aqueça o perfil primeiro.');
+  const w = rep.warmth || {};
+  const num = (v) => (typeof v === 'number' ? v : 0);
+  const fmtSec = (ms) => (ms ? (ms / 1000).toFixed(0) + 's' : '—');
+  const matRow = (label, val) => el('div', { class: 'list-row' }, el('span', { class: 'grow' }, label), el('span', { style: 'font-weight:700' }, String(val)));
+  const steps = rep.steps || [];
+  const stepRows = steps.map((s) => el('div', { class: 'list-row' },
+    el('span', { style: 'font-size:15px' }, s.ok ? '✅' : '⚠️'),
+    el('span', { class: 'grow' }, s.label),
+    el('span', { class: 'hint mono' }, fmtSec(s.ms))));
+  const doms = rep.visitedDomains || [];
+  modal({
+    title: 'Relatório de aquecimento', wide: true,
+    body: [
+      el('div', { style: `font-size:34px;font-weight:800;text-align:center;color:${trustColor(num(w.score))}` }, `${num(w.score)}/100`),
+      el('p', { class: 'hint', style: 'text-align:center;margin-top:0' }, `${rep.locale || '—'} · nicho ${rep.niche || 'default'}${rep.durationMs ? ' · ' + fmtSec(rep.durationMs) : ''}`),
+      el('fieldset', {}, el('legend', {}, 'Maturidade (v2)'),
+        matRow('Cookies', num(w.cookies)),
+        matRow('Domínios distintos', num(w.domains)),
+        matRow('Cookies cross-site (3rd-party)', num(w.thirdParty)),
+        matRow('Cookies persistentes', num(w.persistent)),
+        matRow('Variedade de TLDs', num(w.tlds)),
+        matRow('Storage local (localStorage / IndexedDB)', `${num(w.localStorage)} / ${num(w.indexedDB)}`)),
+      el('fieldset', {}, el('legend', {}, `Jornada — ${steps.filter((s) => s.ok).length}/${steps.length} etapas · ${num(rep.consents)} consentimento(s)`),
+        ...(stepRows.length ? stepRows : [el('p', { class: 'hint' }, 'Sem etapas registradas.')])),
+      el('fieldset', {}, el('legend', {}, `Domínios visitados (${doms.length})`),
+        el('p', { class: 'hint mono', style: 'word-break:break-all' }, doms.length ? doms.join(' · ') : 'nenhum')),
+    ],
+    foot: [el('button', { class: 'ghost', onClick: closeModal }, 'Fechar')],
+  });
+}
+
+// Diálogo de aquecimento (Fase 3): escolhe intensidade (presets de tempo), meta de maturidade
+// opcional e, em lote, quantos navegadores em paralelo (Fase 5). Dispara run/runMany.
+function openWarmDialog(target) {
+  const ids = target.ids || (target.id ? [target.id] : []);
+  if (!ids.length) return;
+  const many = ids.length > 1;
+  let intensity = 'medio';
+  const presets = [['leve', 'Leve · ~2 min'], ['medio', 'Médio · ~4 min'], ['profundo', 'Profundo · ~9 min']];
+  const btns = {};
+  const segRow = el('div', { style: 'display:flex;gap:6px;margin-top:4px' });
+  presets.forEach(([k, lbl]) => {
+    const b = el('button', { class: 'sm' + (k === intensity ? ' primary' : ''), onClick: () => { intensity = k; Object.keys(btns).forEach((kk) => { btns[kk].className = 'sm' + (kk === k ? ' primary' : ''); }); } }, lbl);
+    btns[k] = b; segRow.append(b);
+  });
+  const useTarget = el('input', { type: 'checkbox' });
+  const targetNum = el('input', { type: 'number', value: '70', min: '10', max: '100', style: 'width:74px' });
+  const concNum = el('input', { type: 'number', value: '1', min: '1', max: '3', style: 'width:74px' });
+  modal({
+    title: many ? `Aquecer ${ids.length} perfis` : 'Aquecer perfil',
+    body: [
+      el('label', { class: 'hint' }, 'Intensidade'),
+      segRow,
+      el('label', { style: 'display:flex;gap:8px;align-items:center;margin-top:12px' }, useTarget, el('span', {}, 'Aquecer até a maturidade atingir'), targetNum, el('span', { class: 'hint' }, '/100 (ou o teto de tempo)')),
+      many ? el('label', { style: 'display:flex;gap:8px;align-items:center;margin-top:12px' }, el('span', {}, 'Navegadores em paralelo (1–3):'), concNum) : null,
+      el('p', { class: 'hint', style: 'margin-top:12px' }, 'O aquecimento sempre termina dentro do teto de tempo e fecha o navegador ao concluir.'),
+    ],
+    foot: [
+      el('button', { class: 'ghost', onClick: closeModal }, 'Cancelar'),
+      el('button', { class: 'primary', onClick: () => {
+        const targetScore = useTarget.checked ? Math.max(10, Math.min(100, Number(targetNum.value) || 70)) : null;
+        if (many) inv('cookieRobot.runMany', { ids, intensity, targetScore, concurrency: Math.max(1, Math.min(3, Number(concNum.value) || 1)) });
+        else inv('cookieRobot.run', { id: ids[0], intensity, targetScore });
+        closeModal();
+        toast('🍪 Aquecimento iniciado…');
+      } }, 'Aquecer'),
+    ],
+  });
+}
+
 /* ============================== Motor (1ª execução) ============================== */
 function renderEngineDownload() {
   let ov = $('#engine');
@@ -639,7 +851,33 @@ async function openEditor(profile) {
   };
   drawTags();
 
+  // --- Foto do perfil (avatar) ---
+  let avatarData = profile ? (profile.avatar || '') : '';
+  const avPreview = el('div', { class: 'avatar-edit-img' });
+  const drawAvatar = () => {
+    avPreview.innerHTML = '';
+    if (avatarData) avPreview.append(el('img', { src: avatarData, alt: '' }));
+    else avPreview.append(el('span', {}, initials(fName.value) || '?'));
+  };
+  const avFile = el('input', { type: 'file', accept: 'image/*', style: 'display:none' });
+  avFile.addEventListener('change', async () => {
+    const f = avFile.files && avFile.files[0];
+    avFile.value = '';
+    if (!f) return;
+    const data = await openAvatarCropper(f); // abre o recortador (zoom/posição)
+    if (data) { avatarData = data; drawAvatar(); }
+  });
+  const avPick = el('button', { class: 'sm', type: 'button', onClick: () => avFile.click() }, svg('plus', 14), 'Escolher foto');
+  const avClear = el('button', { class: 'sm', type: 'button', onClick: () => { avatarData = ''; drawAvatar(); } }, 'Remover');
+  fName.addEventListener('input', () => { if (!avatarData) drawAvatar(); });
+  drawAvatar();
+  const avatarRow = el('div', { class: 'avatar-edit' }, avPreview,
+    el('div', { class: 'avatar-edit-actions' }, el('div', { class: 'row2', style: 'gap:8px' }, avPick, avClear),
+      el('div', { class: 'hint' }, 'PNG ou JPG — aparece na lista de perfis. Redimensionada automaticamente.')),
+    avFile);
+
   const paneGeral = el('div', { class: 'tabpane active' },
+    avatarRow,
     el('label', { class: 'fld' }, 'Nome do perfil', fName),
     el('div', { class: 'row2' }, el('label', { class: 'fld' }, 'Status', fStatus), el('label', { class: 'fld' }, 'Pasta', fFolder)),
     el('div', { class: 'row2' }, el('label', { class: 'fld' }, 'Site principal', fSite), el('label', { class: 'fld' }, 'URL inicial', fUrl)),
@@ -791,7 +1029,8 @@ async function openEditor(profile) {
     else if (mode === 'manual' && pHost.value) proxyRef = { proxy: { type: pType.value, host: pHost.value, port: pPort.value, username: pUser.value, password: pPass.value } };
 
     const common = {
-      name: fName.value.trim(), notes: fNotes.value, status: fStatus.value,
+      name: fName.value.trim(), notes: fNotes.value, avatar: avatarData || null,
+      status: fStatus.value,
       folderId: fFolder.value || null, mainWebsite: fSite.value || null,
       startUrl: fUrl.value.trim(), tags: [...selTags], fingerprint: fp,
     };
@@ -846,7 +1085,7 @@ window.api.onEvent((e) => {
   if (!e) return;
   if (e.type === 'warm:start') toast('🍪 Aquecendo perfil…');
   else if (e.type === 'warm:progress') toast(`Aquecendo (${(e.index || 0) + 1}/${e.total})…`);
-  else if (e.type === 'warm:done') toast(e.error ? ('Aquecimento: ' + e.error) : `✓ Aquecimento concluído${e.visited ? ' — ' + e.visited + ' etapas' : ''}${typeof e.warmth === 'number' ? ' · maturidade ' + e.warmth + '/100' : ''}`);
+  else if (e.type === 'warm:done') { toast(e.error ? ('Aquecimento: ' + e.error) : `✓ Aquecimento concluído${e.visited ? ' — ' + e.visited + ' etapas' : ''}${typeof e.warmth === 'number' ? ' · maturidade ' + e.warmth + '/100' : ''}`); if (!e.error && e.report) openWarmReport(e.report); }
   else if (e.type === 'detect:start') toast('🔎 Auditando detecção…');
   else if (e.type === 'detect:progress') toast(e.oracle ? `Consultando ${e.oracle}…` : 'Analisando coerência local…');
   else if (e.type === 'detect:done') { if (e.error) toast('Auditoria: ' + e.error); else { toast(`✓ Auditoria concluída — nota geral ${e.overall}/100`); if (e.report) openDetectReport(e.report); } }

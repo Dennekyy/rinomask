@@ -23,7 +23,7 @@ const check = (n, ok, d) => { (ok ? pass++ : fail++); console.log(`  ${ok ? '✅
   const budget = 50000;
   console.log(`  rodando jornada (nicho crypto, teto ${budget / 1000}s)…`);
   const t0 = Date.now();
-  const r = await cookieRobot.warmUp(page, { niche: 'crypto', budgetMs: budget, onProgress: (s) => console.log('   →', s.label) });
+  const r = await cookieRobot.warmUp(page, { niche: 'crypto', locale: 'en-US', budgetMs: budget, onProgress: (s) => console.log('   →', s.label) });
   const elapsed = Date.now() - t0;
 
   check('a jornada TERMINOU (não pendurou)', true, `${(elapsed / 1000).toFixed(0)}s, ${r.visited}/${r.total} etapas`);
@@ -31,10 +31,22 @@ const check = (n, ok, d) => { (ok ? pass++ : fail++); console.log(`  ${ok ? '✅
   check('percorreu ao menos 1 etapa', r.visited >= 1);
   check('contexto/página continuam vivos', !page.isClosed());
 
-  const w = await cookieRobot.measureWarmth(ctx, r.visited);
+  // Relatório de aquecimento (Fase 2): forma + coerência de locale/nicho.
+  const rep = r.report || {};
+  check('warmUp devolve relatório (report)', !!r.report);
+  check('relatório reflete o locale passado (en-US)', rep.locale === 'en-US', String(rep.locale));
+  check('relatório reflete o nicho (crypto)', rep.niche === 'crypto', String(rep.niche));
+  check('relatório tem etapas {label, ok, ms}', Array.isArray(rep.steps) && rep.steps.length > 0 && rep.steps.every((s) => typeof s.label === 'string' && typeof s.ok === 'boolean' && typeof s.ms === 'number'));
+  check('relatório conta consentimentos (número)', typeof rep.consents === 'number');
+  check('relatório lista domínios visitados (array)', Array.isArray(rep.visitedDomains));
+  check('relatório tem duração (ms > 0)', typeof rep.durationMs === 'number' && rep.durationMs > 0);
+  check('relatório registra passadas (passes >= 1)', typeof rep.passes === 'number' && rep.passes >= 1);
+
+  const w = await cookieRobot.measureWarmth(ctx, r.visited, page);
   console.log('  Maturidade:', JSON.stringify(w));
   check('acumulou cookies de forma orgânica', w.cookies > 0, String(w.cookies));
   check('calculou maturidade (0–100)', typeof w.score === 'number' && w.score >= 0 && w.score <= 100, `${w.score}/100`);
+  check('measureWarmth v2 (1st/3rd-party, persistente, TLDs)', w.v === 2 && typeof w.thirdParty === 'number' && typeof w.persistent === 'number' && typeof w.tlds === 'number');
 
   await launcher.stop(p.id).catch(() => {});
   await require('fs/promises').rm(tmp, { recursive: true, force: true }).catch(() => {});

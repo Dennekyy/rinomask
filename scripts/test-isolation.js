@@ -2,7 +2,7 @@
 
 /*
  * Teste de ISOLAMENTO entre perfis.
- * Usa o mesmo caminho de codigo do app (store + browserLauncher + stealth).
+ * Usa o mesmo caminho de codigo do app (store + browserLauncher).
  *
  * Prova que dois perfis NAO compartilham:
  *   - cookies, localStorage, IndexedDB (storage por origem)

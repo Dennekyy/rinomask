@@ -1,13 +1,11 @@
 'use strict';
 
-// Gera fingerprints realistas e CONSISTENTES por perfil, com parametros avancados
-// no estilo Dolphin: WebRTC, Canvas, WebGL (info/imagem), ClientRects, AudioContext,
-// MediaDevices, Geolocalizacao, DoNotTrack, fontes.
+// Gera os METADADOS de identidade do perfil (SO, regiao/idioma, tela, CPU/RAM, WebRTC,
+// geolocalizacao, DoNotTrack, fontes). A protecao de canvas/WebGL/audio/clientRects e o
+// cursor humano sao aplicados NATIVAMENTE pelo Camoufox (C++); aqui guardamos so o que a
+// UI mostra e o auto-teste de coerencia (trustScore/coherence) verifica.
 
 function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
-
-const CHROME_VERSIONS = ['122.0.0.0', '123.0.0.0', '124.0.0.0', '125.0.0.0', '126.0.0.0'];
 
 const PLATFORMS = [
   {
@@ -70,7 +68,6 @@ function tzOffsetMinutes(timeZone) {
 function generateFingerprint(opts = {}) {
   const plat = opts.os ? PLATFORMS.find((p) => p.os === opts.os) || rand(PLATFORMS) : rand(PLATFORMS);
   const region = opts.region ? REGIONS.find((r) => r.timezone === opts.region) || rand(REGIONS) : rand(REGIONS);
-  const chrome = rand(CHROME_VERSIONS);
   const screen = rand(SCREENS);
   const webgl = rand(plat.webgl);
   const taskbar = plat.os === 'macOS' ? 25 : 40;
@@ -81,10 +78,9 @@ function generateFingerprint(opts = {}) {
   return {
     engine: 'camoufox',
     os: plat.os,
-    userAgent: plat.ua(chrome),
+    userAgent: plat.ua(),
     platform: plat.platform,
     uaPlatform: plat.uaPlatform,
-    chromeVersion: chrome,
     hardwareConcurrency: cpu,
     deviceMemory: mem,
     maxTouchPoints: 0,
@@ -99,19 +95,11 @@ function generateFingerprint(opts = {}) {
       colorDepth: 24, pixelDepth: 24,
     },
     webgl,
-    // Modos de protecao (estilo Dolphin):
-    canvasMode: 'noise',      // noise | off
-    webglMode: 'noise',       // noise | off  (WebGL Image)
-    audioMode: 'noise',       // noise | off
-    clientRectsMode: 'noise', // noise | off
-    webrtcMode: 'altered',    // altered (mascara via proxy) | real | disabled
+    // WebRTC: 'altered' mascara via proxy (Camoufox spoofa o IP do WebRTC) | 'disabled' bloqueia.
+    webrtcMode: 'altered',
     geolocation: { mode: 'auto', lat: region.geo.lat, lon: region.geo.lon, accuracy: 50 },
     doNotTrack: false,
     fonts: plat.os === 'macOS' ? MAC_FONTS.slice() : WINDOWS_FONTS.slice(),
-    // Sementes deterministicas (identidade estavel por perfil):
-    canvasSeed: randInt(1, 1e6),
-    audioSeed: randInt(1, 1e6),
-    clientRectsSeed: randInt(1, 1e6),
   };
 }
 

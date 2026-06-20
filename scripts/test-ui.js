@@ -56,7 +56,7 @@ const root = path.join(__dirname, '..');
     await win.locator('.modal .tab', { hasText: 'Proxy' }).click();
     check('troca para aba Proxy', await win.locator('.modal .tabpane').nth(2).isVisible());
     await win.locator('.modal .tab', { hasText: 'Geral' }).click();
-    await win.locator('.modal input').first().fill('UI Teste 1');
+    await win.locator('.modal input:not([type=file])').first().fill('UI Teste 1');
     await win.locator('.modal-foot button.primary').click(); // Criar perfil
     await win.waitForTimeout(500);
     check('perfil criado aparece na tabela', (await win.locator('#rows tr').count()) >= 1, (await win.locator('#rows tr').count()) + ' linha(s)');

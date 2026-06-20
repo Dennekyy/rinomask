@@ -14,13 +14,15 @@ const RELEASES_URL = `https://github.com/${OWNER}/${REPO}/releases`;
 function fetchJson(url, redirects = 0) {
   return new Promise((resolve, reject) => {
     if (redirects > 5) return reject(new Error('redirecionamentos demais'));
-    https.get(url, { headers: { 'User-Agent': 'RinoMask', 'Cache-Control': 'no-cache' } }, (res) => {
+    const req = https.get(url, { headers: { 'User-Agent': 'RinoMask', 'Cache-Control': 'no-cache' }, timeout: 15000 }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) { fetchJson(res.headers.location, redirects + 1).then(resolve, reject); return; }
       if (res.statusCode !== 200) return reject(new Error('HTTP ' + res.statusCode));
       let data = '';
       res.on('data', (c) => (data += c));
       res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
-    }).on('error', reject);
+    });
+    req.on('error', reject);
+    req.on('timeout', () => req.destroy(new Error('timeout (15s)')));
   });
 }
 

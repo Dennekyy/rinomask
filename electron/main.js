@@ -14,6 +14,7 @@ const errorLog = require('../src/errorLog');
 const branding = require('../src/branding');
 const updateChecker = require('../src/updateChecker');
 const { REGIONS, PLATFORMS, WINDOWS_FONTS, MAC_FONTS, generateFingerprint, tzOffsetMinutes } = require('../src/fingerprint');
+const { resolveIntensity } = require('../src/warmContent');
 
 // Captura erros não tratados do processo principal (init do log acontece no whenReady;
 // até lá vira no-op seguro).
@@ -66,13 +67,16 @@ async function ensureLaunched(id) {
 
 // Aquece um perfil: abre o navegador VISÍVEL, executa o Cookie Robot, mede a maturidade
 // (cookies/domínios/sites) e FECHA o navegador ao terminar. Headless só em testes.
-async function warmProfile(id) {
+async function warmProfile(id, opts) {
   const prof = store.getProfile(id);
   if (!prof) { emit('warm:done', { id, error: 'perfil não encontrado' }); return; }
   const wasRunning = launcher.isRunning(id);
   if (wasRunning && launcher.kindOf(id) !== 'pw') { emit('warm:done', { id, error: 'feche o navegador (modo manual) antes de aquecer' }); return; }
   let launchedByRobot = false;
-  const BUDGET = 4 * 60 * 1000;
+  // Intensidade (Fase 3) define o teto base; HARD/killer derivam dele → garantia de término preservada.
+  const intensity = resolveIntensity(opts && opts.intensity);
+  const targetScore = opts && typeof opts.targetScore === 'number' ? opts.targetScore : null;
+  const BUDGET = intensity.budgetMs;
   // Trava de segurança: fecha o navegador no pior caso, mesmo se algo travar além do teto interno.
   let killer = null;
   try {
@@ -89,10 +93,13 @@ async function warmProfile(id) {
     // Jornada começo→meio→fim direcionada ao nicho. Teto ABSOLUTO via Promise.race: o aquecimento
     // NUNCA passa de HARD, mesmo se algo interno travar (o navegador é fechado no finally).
     const HARD = BUDGET + 60000;
+    // locale/region do perfil → conteúdo de aquecimento COERENTE com a identidade (não mais pt-BR fixo).
+    const fp = prof.fingerprint || {};
+    const avoid = (prof.warmHistory && Array.isArray(prof.warmHistory.domains)) ? prof.warmHistory.domains : [];
     const result = await Promise.race([
       (async () => {
-        const r = await cookieRobot.warmUp(page, { niche: prof.mainWebsite, budgetMs: BUDGET, onProgress: (pr) => emit('warm:progress', { id, ...pr }) });
-        let w = null; try { w = await cookieRobot.measureWarmth(page.context(), r.visited); } catch (e) {}
+        const r = await cookieRobot.warmUp(page, { niche: prof.mainWebsite, locale: fp.locale, region: fp.timezone, budgetMs: BUDGET, targetScore, avoid, onProgress: (pr) => emit('warm:progress', { id, ...pr }) });
+        let w = null; try { w = await cookieRobot.measureWarmth(page.context(), r.visited, page); } catch (e) {}
         return { r, w };
       })(),
       new Promise((res) => setTimeout(() => res('__timeout__'), HARD)),
@@ -100,8 +107,13 @@ async function warmProfile(id) {
     if (result === '__timeout__') {
       emit('warm:done', { id, error: 'tempo limite atingido — encerrado' });
     } else {
-      if (result.w) store.setWarmth(id, { ...result.w, at: new Date().toISOString() });
-      emit('warm:done', { id, visited: result.r.visited, warmth: result.w ? result.w.score : 0 });
+      const at = new Date().toISOString();
+      if (result.w) store.setWarmth(id, { ...result.w, at });
+      // Relatório completo (padrão do detectReport): maturidade v2 + etapas + consentimentos + domínios.
+      const report = { v: 2, at, intensity: intensity.key, ...result.r.report, warmth: result.w || null };
+      store.setWarmReport(id, report);
+      store.setWarmVisited(id, result.r.report.visitedDomains); // Fase 3: diversifica a próxima execução
+      emit('warm:done', { id, visited: result.r.visited, warmth: result.w ? result.w.score : 0, report });
     }
   } catch (e) {
     errorLog.log({ source: 'cookieRobot', message: e && e.message, stack: e && e.stack, context: { id } });
@@ -111,6 +123,16 @@ async function warmProfile(id) {
     if (launchedByRobot) await launcher.stop(id).catch(() => {}); // fecha a janela ao concluir
     notifyChanged();
   }
+}
+
+// Aquece vários perfis (Fase 5): pool de concorrência configurável (default 1, teto 3) para
+// equilibrar velocidade × memória — cada perfil abre seu próprio navegador.
+async function runManyWarm({ ids, intensity, targetScore, concurrency } = {}) {
+  const queue = Array.isArray(ids) ? ids.slice() : [];
+  const conc = Math.max(1, Math.min(3, Number(concurrency) || 1));
+  const opts = { intensity, targetScore };
+  const worker = async () => { while (queue.length) { const id = queue.shift(); await warmProfile(id, opts); } };
+  await Promise.all(Array.from({ length: Math.min(conc, queue.length) }, () => worker()));
 }
 
 // Auditoria de detecção: abre o perfil, roda a bateria local + os oráculos externos
@@ -262,8 +284,8 @@ const handlers = {
   'tags.delete': (p) => { store.deleteTag(p.id); notifyChanged(); return { ok: true }; },
 
   // --- cookie robot (aquecimento) ---
-  'cookieRobot.run': (p) => { warmProfile(p.id); return { started: true }; },
-  'cookieRobot.runMany': (p) => { (async () => { for (const id of p.ids) await warmProfile(id); })(); return { started: true }; },
+  'cookieRobot.run': (p) => { warmProfile(p.id, { intensity: p && p.intensity, targetScore: p && p.targetScore }); return { started: true }; },
+  'cookieRobot.runMany': (p) => { runManyWarm(p || {}); return { started: true }; },
 
   // --- trust score (auto-teste de indetectabilidade) ---
   'trust.run': async (p) => {

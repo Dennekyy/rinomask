@@ -8,6 +8,8 @@
 // Não importa cookies de terceiros (isso contaminaria a identidade do perfil).
 
 const { rand, sleep, dwell, humanType, humanScroll, clickMaybe } = require('./humanInput');
+// Conteúdo de aquecimento por LOCALE × nicho (coerência com a região do perfil) e o scoring v2.
+const { pickPool, scoreWarmth, avoidFilter } = require('./warmContent');
 
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const chance = (p) => Math.random() < p;
@@ -19,35 +21,9 @@ function withTimeout(promise, ms, label) {
   return Promise.race([Promise.resolve(promise).finally(() => clearTimeout(t)), guard]);
 }
 
-// Pools genéricos (fallback).
-const QUERIES = ['notícias de hoje', 'previsão do tempo', 'cotação do dólar', 'melhores séries 2026', 'curiosidades sobre o espaço', 'receita de bolo de cenoura', 'resultado do brasileirão'];
-const VIDEO_Q = ['música para relaxar', 'documentário natureza 4k', 'notícias da semana resumo', 'lo-fi para estudar', 'podcast tecnologia'];
-const SITES = ['https://g1.globo.com/', 'https://www.uol.com.br/', 'https://www.cnnbrasil.com.br/', 'https://pt.wikipedia.org/wiki/Especial:Aleat%C3%B3ria', 'https://www.bbc.com/portuguese'];
-
-// Nichos: dão DIREÇÃO ao aquecimento (buscas/vídeos/sites coerentes + destino final).
-const NICHES = {
-  default: { q: QUERIES, vq: VIDEO_Q, sites: SITES, home: null },
-  google: { q: QUERIES, vq: VIDEO_Q, sites: SITES, home: 'https://www.google.com/' },
-  facebook: {
-    q: ['notícias de hoje', 'memes do dia', 'receitas fáceis', 'grupos de venda na cidade'],
-    vq: ['notícias da semana resumo', 'receitas fáceis e rápidas', 'música para relaxar'],
-    sites: ['https://g1.globo.com/', 'https://www.uol.com.br/', 'https://www.metropoles.com/'],
-    home: 'https://www.facebook.com/',
-  },
-  tiktok: {
-    q: ['trends do tiktok', 'músicas em alta', 'desafios virais', 'dança viral'],
-    vq: ['música em alta 2026', 'comédia stand up brasil', 'gameplay relaxante'],
-    sites: ['https://www.adorocinema.com/', 'https://www.letras.mus.br/', 'https://www.tecmundo.com.br/'],
-    home: 'https://www.tiktok.com/',
-  },
-  crypto: {
-    q: ['preço do bitcoin hoje', 'o que é blockchain', 'como investir em cripto', 'cotação ethereum'],
-    vq: ['análise bitcoin hoje', 'o que é blockchain explicado', 'notícias cripto da semana'],
-    sites: ['https://www.infomoney.com.br/', 'https://br.cointelegraph.com/', 'https://www.investing.com/crypto/'],
-    home: 'https://www.binance.com/pt-BR',
-  },
-};
-const pickNiche = (n) => NICHES[String(n || '').toLowerCase()] || NICHES.default;
+// Pool padrão (pt-BR) usado pelas tarefas "soltas" de teste; o aquecimento real escolhe o pool
+// coerente com o locale do perfil via pickPool(locale, niche). Ver src/warmContent.js.
+const DEFAULT_POOL = pickPool('pt-BR', 'default');
 
 // ---- Consentimento de cookies (estratégia híbrida) ----
 // 1) caminho rápido: seletores conhecidos de alta precisão.
@@ -217,25 +193,40 @@ async function watchVideo(page, ms) {
 
 /* ===================== Etapas (todas direcionadas pelo nicho N) ===================== */
 
-async function searchEngine(page, N, engine = 'google') {
-  await goto(page, engine === 'bing' ? 'https://www.bing.com/' : 'https://www.google.com/');
-  await acceptConsent(page);
-  const box = page.locator(engine === 'bing' ? '#sb_form_q, textarea[name="q"], input[name="q"]' : 'textarea[name="q"], input[name="q"]');
-  if (!(await box.count().catch(() => 0))) return;
-  await humanType(page, box, pick(N.q));
-  await dwell(400, 1000);
-  await page.keyboard.press('Enter').catch(() => {});
-  await page.waitForLoadState('domcontentloaded').catch(() => {});
-  await dwell(1800, 3500); await humanScroll(page, rand(2, 4));
-  const result = engine === 'bing' ? '#b_results h2 a' : '#search a:has(h3), #rso a:has(h3)';
-  if (chance(0.8) && await clickMaybe(page, page.locator(result).first())) {
-    await dwell(2500, 6000); await humanScroll(page, rand(2, 4));
+// Motores de busca + seletores. DuckDuckGo entra como rede de segurança (Fase 4).
+const ENGINES = {
+  google: { url: 'https://www.google.com/', box: 'textarea[name="q"], input[name="q"]', result: '#search a:has(h3), #rso a:has(h3)' },
+  bing: { url: 'https://www.bing.com/', box: '#sb_form_q, textarea[name="q"], input[name="q"]', result: '#b_results h2 a' },
+  duckduckgo: { url: 'https://duckduckgo.com/', box: '#searchbox_input, input[name="q"]', result: 'a[data-testid="result-title-a"], a.result__a, #links h2 a' },
+};
+
+// Busca RESILIENTE (Fase 4): tenta o motor pedido e, se ele degradar (não carrega ou some a
+// caixa de busca), cai para os outros — Google → Bing → DuckDuckGo. Retorna o motor que funcionou.
+async function searchEngine(page, N, engine = 'google', acc = {}) {
+  const order = [engine, 'google', 'bing', 'duckduckgo'].filter((e, i, a) => ENGINES[e] && a.indexOf(e) === i);
+  const query = pick(N.q);
+  for (const eng of order) {
+    const E = ENGINES[eng];
+    if (!(await goto(page, E.url))) continue;
+    if (await acceptConsent(page)) acc.consents = (acc.consents || 0) + 1;
+    const box = page.locator(E.box);
+    if (!(await box.count().catch(() => 0))) continue; // motor degradado → tenta o próximo
+    await humanType(page, box, query);
+    await dwell(400, 1000);
+    await page.keyboard.press('Enter').catch(() => {});
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
+    await dwell(1800, 3500); await humanScroll(page, rand(2, 4));
+    if (chance(0.8) && await clickMaybe(page, page.locator(E.result).first())) {
+      await dwell(2500, 6000); await humanScroll(page, rand(2, 4));
+    }
+    return eng;
   }
+  return null;
 }
 
-async function watchYouTube(page, N) {
+async function watchYouTube(page, N, acc = {}) {
   await goto(page, 'https://www.youtube.com/');
-  await acceptConsent(page);
+  if (await acceptConsent(page)) acc.consents = (acc.consents || 0) + 1;
   await dwell(1400, 2600);
   const box = page.locator('input#search, ytd-searchbox input, input[name="search_query"]');
   if (await box.count().catch(() => 0)) {
@@ -254,9 +245,9 @@ async function watchYouTube(page, N) {
   }
 }
 
-async function browseSite(page, N) {
-  await goto(page, pick(N.sites));
-  await acceptConsent(page);
+async function browseSite(page, N, acc = {}, avoid) {
+  await goto(page, pick(avoidFilter(N.sites, avoid)));
+  if (await acceptConsent(page)) acc.consents = (acc.consents || 0) + 1;
   await dwell(2000, 4000); await humanScroll(page, rand(3, 6));
   if (chance(0.7) && await clickMaybe(page, page.locator('main a[href]:visible, article a[href]:visible, a[href^="/"]:visible').first())) {
     await page.waitForLoadState('domcontentloaded').catch(() => {});
@@ -265,66 +256,154 @@ async function browseSite(page, N) {
 }
 
 // FIM: aterrissa no destino do perfil (a plataforma), sem login — última atividade coerente.
-async function landAtDestination(page, N) {
-  const url = N.home || pick(N.sites);
+async function landAtDestination(page, N, acc = {}, avoid) {
+  const url = N.home || pick(avoidFilter(N.sites, avoid));
   await goto(page, url);
-  await acceptConsent(page);
+  if (await acceptConsent(page)) acc.consents = (acc.consents || 0) + 1;
   await dwell(3000, 6000); await humanScroll(page, rand(2, 4));
 }
 
-// Tarefas "soltas" (usadas por testes via { tasks: [...] }), no nicho default.
+// Tarefas "soltas" (usadas por testes via { tasks: [...] }), no pool default (pt-BR).
 const TASKS = {
-  google: (p) => searchEngine(p, NICHES.default, 'google'),
-  bing: (p) => searchEngine(p, NICHES.default, 'bing'),
-  youtube: (p) => watchYouTube(p, NICHES.default),
-  browse: (p) => browseSite(p, NICHES.default),
-  maps: (p) => browseSite(p, NICHES.default),
+  google: (p) => searchEngine(p, DEFAULT_POOL, 'google'),
+  bing: (p) => searchEngine(p, DEFAULT_POOL, 'bing'),
+  youtube: (p) => watchYouTube(p, DEFAULT_POOL),
+  browse: (p) => browseSite(p, DEFAULT_POOL),
+  maps: (p) => browseSite(p, DEFAULT_POOL),
 };
 
-// Monta a jornada começo → meio → fim (4–5 etapas), direcionada pelo nicho.
-function buildJourney(N) {
+// Monta a jornada começo → meio → fim (4–5 etapas), consumindo o POOL coerente (locale × nicho).
+// acc acumula consentimentos aceitos; `avoid` (hosts recém-visitados) diversifica a leitura.
+function buildJourney(pool, acc = {}, avoid) {
+  const eng = pool.engine || 'google';
+  // Variedade: às vezes Bing (ambos neutros de idioma) quando o pool prefere Google.
+  const searchEng = (eng === 'google' && chance(0.25)) ? 'bing' : eng;
   const steps = [];
-  steps.push({ label: 'início: busca', maxMs: 55000, run: (p) => searchEngine(p, N, chance(0.25) ? 'bing' : 'google') });
-  steps.push({ label: 'interesse: vídeo', maxMs: 95000, run: (p) => watchYouTube(p, N) });
-  steps.push({ label: 'interesse: leitura', maxMs: 60000, run: (p) => browseSite(p, N) });
-  if (chance(0.5)) steps.push({ label: 'interesse: leitura', maxMs: 60000, run: (p) => browseSite(p, N) });
-  steps.push({ label: 'destino: ' + (N.home ? new URL(N.home).hostname.replace('www.', '') : 'portal'), maxMs: 50000, run: (p) => landAtDestination(p, N) });
+  steps.push({ label: 'início: busca', maxMs: 55000, run: (p) => searchEngine(p, pool, searchEng, acc) });
+  steps.push({ label: 'interesse: vídeo', maxMs: 95000, run: (p) => watchYouTube(p, pool, acc) });
+  steps.push({ label: 'interesse: leitura', maxMs: 60000, run: (p) => browseSite(p, pool, acc, avoid) });
+  if (chance(0.5)) steps.push({ label: 'interesse: leitura', maxMs: 60000, run: (p) => browseSite(p, pool, acc, avoid) });
+  steps.push({ label: 'destino: ' + (pool.home ? new URL(pool.home).hostname.replace('www.', '') : 'portal'), maxMs: 50000, run: (p) => landAtDestination(p, pool, acc, avoid) });
   return steps;
 }
 
-async function measureWarmth(context, visited) {
+// Mede a MATURIDADE do perfil (v2). Além de cookies/domínios, distingue 1st/3rd-party
+// (cookies cross-site = SameSite=None), persistente vs sessão, variedade de TLDs e storage
+// local (localStorage/IndexedDB) da origem final. O scoring vive em warmContent.scoreWarmth.
+async function measureWarmth(context, visited, page) {
   let cookies = [];
   try { cookies = await context.cookies(); } catch (e) {}
-  const domains = new Set(cookies.map((c) => String(c.domain || '').replace(/^\./, '')).filter(Boolean)).size;
-  const c = Math.min(50, cookies.length * 0.7);
-  const d = Math.min(35, domains * 2.2);
-  const v = Math.min(15, (visited || 0) * 1.5);
-  return { score: Math.round(c + d + v), cookies: cookies.length, domains, visited: visited || 0 };
+  const domainSet = new Set();
+  const tldSet = new Set();
+  let thirdParty = 0, firstParty = 0, persistent = 0, session = 0, secure = 0;
+  for (const c of cookies) {
+    const dom = String(c.domain || '').replace(/^\./, '');
+    if (dom) {
+      domainSet.add(dom);
+      const parts = dom.split('.');
+      if (parts.length >= 2) tldSet.add(parts.slice(-2).join('.'));
+    }
+    if (c.sameSite === 'None') thirdParty++; else firstParty++; // SameSite=None ~ cookie cross-site
+    if (typeof c.expires === 'number' && c.expires > 0) persistent++; else session++;
+    if (c.secure) secure++;
+  }
+  // Storage local da origem em que a página terminou (sinal extra de "vida" — best-effort).
+  let ls = 0, idb = 0;
+  if (page && !page.isClosed()) {
+    try {
+      const st = await page.evaluate(async () => {
+        let l = 0, d = 0;
+        try { l = window.localStorage ? window.localStorage.length : 0; } catch (e) {}
+        try { if (indexedDB && indexedDB.databases) { const dbs = await indexedDB.databases(); d = (dbs || []).length; } } catch (e) {}
+        return { l, d };
+      });
+      ls = st.l || 0; idb = st.d || 0;
+    } catch (e) {}
+  }
+  const signals = {
+    cookies: cookies.length,
+    domains: domainSet.size,
+    tlds: tldSet.size,
+    firstParty, thirdParty, persistent, session, secure,
+    localStorage: ls, indexedDB: idb,
+    visited: visited || 0,
+  };
+  return { v: 2, score: scoreWarmth(signals), ...signals };
 }
 
-// Aquece um perfil já aberto. SEMPRE termina dentro do teto (budgetMs) e por etapa (maxMs).
-async function warmUp(page, { tasks, niche, onProgress, budgetMs } = {}) {
-  const context = page.context();
-  const deadline = Date.now() + (budgetMs || 4 * 60 * 1000); // teto global ~4 min
-  const N = pickNiche(niche);
-  const plan = (tasks && tasks.length)
-    ? tasks.filter((k) => TASKS[k]).map((k) => ({ label: k, maxMs: 95000, run: TASKS[k] }))
-    : buildJourney(N);
+const MIN_DOMAINS = 4;     // Fase 4: variedade mínima de domínios distintos por aquecimento
+const MIN_PASS_MS = 35000; // Fase 3: não inicia nova passada (modo meta) com pouco tempo restante
 
-  let i = 0, visited = 0;
-  for (const step of plan) {
-    if (Date.now() > deadline) break; // teto global → garante o fim
-    if (onProgress) onProgress({ label: step.label, index: i, total: plan.length });
+// Aquece um perfil já aberto. SEMPRE termina dentro do teto (budgetMs) e por etapa (maxMs).
+// Usa o pool coerente com locale/niche. Opções:
+//   targetScore — repete passadas até a maturidade ≥ alvo (ou o teto de tempo);
+//   avoid       — hosts recém-visitados (execuções anteriores) a diversificar.
+// Devolve um relatório (etapas com status, consentimentos, domínios, passadas).
+async function warmUp(page, { tasks, niche, locale, region, onProgress, budgetMs, targetScore, avoid } = {}) {
+  const context = page.context();
+  const startedAt = Date.now();
+  const deadline = startedAt + (budgetMs || 4 * 60 * 1000); // teto global
+  const pool = pickPool(locale, niche);
+  const acc = { consents: 0 };
+  const recentAvoid = Array.isArray(avoid) ? avoid.slice() : [];
+  const steps = [];
+  const domainSet = new Set();
+  const wantsTarget = typeof targetScore === 'number' && targetScore > 0;
+  let stepIdx = 0, totalEst = 0, passes = 0, reachedTarget = false, lastScore = null;
+
+  // Executa uma etapa com teto por etapa e global; registra status (Fase 4) e o domínio final.
+  const runStep = async (step) => {
+    if (Date.now() > deadline) return false;
+    if (onProgress) onProgress({ label: step.label, index: stepIdx, total: Math.max(totalEst, stepIdx + 1) });
+    const t0 = Date.now();
+    let ok = false;
     try {
       if (page.isClosed()) page = await context.newPage();
       const left = deadline - Date.now();
       await withTimeout(step.run(page), Math.min(step.maxMs || 90000, Math.max(8000, left)), step.label);
-      visited++;
+      ok = true;
+      try { const h = new URL(page.url()).hostname.replace(/^www\./, ''); if (h && h !== 'about' && h !== 'about:blank') domainSet.add(h); } catch (e) {}
     } catch (e) { /* timeout/erro de uma etapa não derruba o aquecimento */ }
+    steps.push({ label: step.label, ok, ms: Date.now() - t0 });
     try { await dwell(1000, 2400); } catch (e) {}
-    i++;
+    stepIdx++;
+    return ok;
+  };
+
+  const makeReport = () => ({
+    locale: pool.locale, niche: pool.niche, region: region || null,
+    consents: acc.consents, steps, visitedDomains: Array.from(domainSet),
+    durationMs: Date.now() - startedAt, passes,
+    targetScore: wantsTarget ? targetScore : null, reachedTarget, lastScore,
+  });
+
+  // Modo "tarefas soltas" (testes): uma passada simples, sem meta/variedade.
+  if (tasks && tasks.length) {
+    const plan = tasks.filter((k) => TASKS[k]).map((k) => ({ label: k, maxMs: 95000, run: TASKS[k] }));
+    totalEst = plan.length;
+    for (const step of plan) await runStep(step);
+    return { visited: steps.filter((s) => s.ok).length, total: steps.length, report: makeReport() };
   }
-  return { visited, total: plan.length };
+
+  // Jornada por nicho/locale. Com targetScore, repete passadas até atingir a meta ou o teto.
+  do {
+    const avoidNow = recentAvoid.concat(Array.from(domainSet));
+    const journey = buildJourney(pool, acc, avoidNow);
+    totalEst += journey.length;
+    for (const step of journey) await runStep(step);
+    passes++;
+    if (wantsTarget) {
+      try { const w = await measureWarmth(context, stepIdx, page); lastScore = w.score; if (w.score >= targetScore) { reachedTarget = true; break; } } catch (e) {}
+    }
+  } while (wantsTarget && (deadline - Date.now()) > MIN_PASS_MS);
+
+  // Fase 4: garante um piso de domínios distintos mesmo com Google/YouTube degradados.
+  while (domainSet.size < MIN_DOMAINS && (deadline - Date.now()) > 12000) {
+    const avoidNow = recentAvoid.concat(Array.from(domainSet));
+    await runStep({ label: 'reforço: leitura', maxMs: 45000, run: (p) => browseSite(p, pool, acc, avoidNow) });
+  }
+
+  return { visited: steps.filter((s) => s.ok).length, total: steps.length, report: makeReport() };
 }
 
 module.exports = { warmUp, TASKS, buildJourney, measureWarmth, acceptConsent };

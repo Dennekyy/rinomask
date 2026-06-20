@@ -198,6 +198,7 @@ function createProfile(input = {}) {
     id,
     name: input.name || `Perfil ${db.profiles.filter((p) => !p.deletedAt).length + 1}`,
     notes: input.notes || '',
+    avatar: input.avatar || null, // foto do perfil (data URL leve) exibida na lista
     status: input.status || 'new',
     tags: input.tags || [],
     folderId: input.folderId || null,
@@ -221,7 +222,7 @@ function createProfile(input = {}) {
 function updateProfile(id, patch = {}) {
   const p = db.profiles.find((x) => x.id === id);
   if (!p) return null;
-  const fields = ['name', 'notes', 'status', 'tags', 'folderId', 'mainWebsite', 'startUrl', 'pinned'];
+  const fields = ['name', 'notes', 'avatar', 'status', 'tags', 'folderId', 'mainWebsite', 'startUrl', 'pinned'];
   for (const f of fields) if (patch[f] !== undefined) p[f] = patch[f];
   if (patch.proxyId !== undefined) {
     p.proxyId = patch.proxyId;
@@ -269,6 +270,23 @@ function setDetectReport(id, data) {
   if (p) { p.detect = data; save(); }
 }
 
+// Guarda o último relatório de aquecimento (etapas, consentimentos, domínios, maturidade v2).
+function setWarmReport(id, data) {
+  const p = db.profiles.find((x) => x.id === id);
+  if (p) { p.warmReport = data; save(); }
+}
+
+// Histórico de domínios recém-aquecidos (Fase 3): usado para DIVERSIFICAR a próxima execução.
+// Mantém os mais recentes primeiro, com teto de 24 (não cresce indefinidamente).
+function setWarmVisited(id, domains) {
+  const p = db.profiles.find((x) => x.id === id);
+  if (!p) return;
+  const prev = (p.warmHistory && Array.isArray(p.warmHistory.domains)) ? p.warmHistory.domains : [];
+  const merged = [...new Set([...(domains || []), ...prev])].filter(Boolean).slice(0, 24);
+  p.warmHistory = { domains: merged, at: now() };
+  save();
+}
+
 // Persiste a fingerprint estável (BrowserForge + WebGL/seeds) gerada na 1a abertura.
 function setFingerprintData(id, data) {
   const p = db.profiles.find((x) => x.id === id);
@@ -292,6 +310,7 @@ function cloneProfile(id, count = 1, randomize = true) {
     const copy = createProfile({
       name: `${src.name} (cópia ${i})`,
       notes: src.notes,
+      avatar: src.avatar,
       status: src.status,
       tags: src.tags.slice(),
       folderId: src.folderId,
@@ -485,7 +504,7 @@ function saveSettings(patch) { Object.assign(db.settings, patch); save(); }
 
 module.exports = {
   setDataDir, userDataDir,
-  listProfiles, getProfile, createProfile, updateProfile, markLaunched, setFingerprintData, setTrustScore, setWarmth, setDetectReport,
+  listProfiles, getProfile, createProfile, updateProfile, markLaunched, setFingerprintData, setTrustScore, setWarmth, setDetectReport, setWarmReport, setWarmVisited,
   cloneProfile, bulkSetStatus, bulkAddTag, bulkRemoveTag, bulkSetFolder, bulkSetProxy,
   trashProfiles, restoreProfiles, deleteProfilesForever, resolveProxy,
   listProxies, createProxy, updateProxyMeta, deleteProxy, importProxiesBulk,
