@@ -38,7 +38,7 @@
     "dist": "electron-builder --win --dir && node scripts/apply-icon.js && electron-builder --win nsis --prepackaged dist/win-unpacked",
     "dist:dir": "electron-builder --win --dir",
     "release": "node scripts/release.js",
-    "postinstall": "node scripts/setup-electron.js && node scripts/fetch-rcedit.js"
+    "postinstall": "node scripts/setup-electron.js && node scripts/fetch-rcedit.js && node scripts/fix-better-sqlite3-abi.js"
   },
   "dependencies": {
     "camoufox-js": "^0.11.0",
@@ -78,7 +78,8 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "deleteAppDataOnUninstall": false
+      "deleteAppDataOnUninstall": true,
+      "include": "build/installer.nsh"
     }
   }
 }
