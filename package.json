@@ -35,7 +35,7 @@
     "debug:warm": "node scripts/_enode.js scripts/debug-warm.js",
     "manifest": "node scripts/make-manifest.js",
     "icon": "electron scripts/make-icon.js",
-    "dist": "electron-builder --win",
+    "dist": "electron-builder --win --dir && node scripts/apply-icon.js && electron-builder --win nsis --prepackaged dist/win-unpacked",
     "dist:dir": "electron-builder --win --dir",
     "release": "node scripts/release.js",
     "postinstall": "node scripts/setup-electron.js && node scripts/fetch-rcedit.js"
