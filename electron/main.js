@@ -37,19 +37,31 @@ function emit(type, payload) {
 }
 
 // --- Motor (Camoufox) — baixado no primeiro uso (instalador enxuto) ---
-async function isEngineInstalled() {
-  try { const pk = await import('camoufox-js/dist/pkgman.js'); pk.launchPath(); return true; } catch (e) { return false; }
-}
+const camoufox = require('../src/engines/camoufox');
+async function isEngineInstalled() { return camoufox.isInstalled(); }
 function engineCliPath() { return require.resolve('camoufox-js/dist/__main__.js'); }
 function downloadEngine() {
   return new Promise((resolve) => {
-    const { spawn } = require('child_process');
-    const child = spawn(process.execPath, [engineCliPath(), 'fetch'], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } });
-    const onData = (d) => emit('engine:progress', { line: String(d).replace(/\s+/g, ' ').trim().slice(0, 140) });
-    child.stdout.on('data', onData);
-    child.stderr.on('data', onData);
-    child.on('exit', async (code) => { if (code === 0) await branding.applyBranding((e) => errorLog.log(e)).catch(() => {}); emit('engine:done', { ok: code === 0 }); resolve(code === 0); });
-    child.on('error', () => { emit('engine:done', { ok: false }); resolve(false); });
+    (async () => {
+      // Limpa instalação anterior parcial/corrompida (ex.: download interrompido por erro de
+      // rede) antes de tentar de novo — evita misturar arquivos de tentativas diferentes.
+      try { const dir = await camoufox.installDir(); await require('fs').promises.rm(dir, { recursive: true, force: true }); } catch (e) {}
+      const { spawn } = require('child_process');
+      const child = spawn(process.execPath, [engineCliPath(), 'fetch'], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } });
+      const onData = (d) => emit('engine:progress', { line: String(d).replace(/\s+/g, ' ').trim().slice(0, 140) });
+      child.stdout.on('data', onData);
+      child.stderr.on('data', onData);
+      child.on('exit', async (code) => {
+        // O exit code 0 da CLI não garante que o binário ficou íntegro (ex.: extração truncada
+        // por queda de rede no meio) — confirmamos com a mesma checagem usada antes de lançar.
+        const ok = code === 0 && (await isEngineInstalled());
+        if (ok) await branding.applyBranding((e) => errorLog.log(e)).catch(() => {});
+        else if (code === 0) errorLog.log({ source: 'engine:download', message: 'fetch retornou sucesso mas o motor nao passou na verificacao de integridade' });
+        emit('engine:done', { ok });
+        resolve(ok);
+      });
+      child.on('error', () => { emit('engine:done', { ok: false }); resolve(false); });
+    })();
   });
 }
 
@@ -246,16 +258,22 @@ const handlers = {
   },
   'profiles.stop': async (p) => { const r = await launcher.stop(p.id); notifyChanged(); return r; },
   'profiles.launchMany': async (p) => {
+    const failed = [];
     for (const id of p.ids) {
       const prof = store.getProfile(id);
       if (prof && !launcher.isRunning(id)) {
-        if (process.env.RINOMASK_HEADLESS === '1') await launcher.launchAutomation(prof, { headless: true }).catch(() => {});
-        else await launcher.launchManual(prof).catch(() => {});
-        store.markLaunched(id);
+        try {
+          if (process.env.RINOMASK_HEADLESS === '1') await launcher.launchAutomation(prof, { headless: true });
+          else await launcher.launchManual(prof);
+          store.markLaunched(id);
+        } catch (e) {
+          errorLog.log({ source: 'profiles.launchMany', message: e && e.message, context: { id } });
+          failed.push({ id, name: prof.name, error: (e && e.message) || 'falha desconhecida' });
+        }
       }
     }
     notifyChanged();
-    return { ok: true };
+    return { ok: failed.length === 0, failed };
   },
   'profiles.stopMany': async (p) => {
     for (const id of p.ids) if (launcher.isRunning(id)) await launcher.stop(id);

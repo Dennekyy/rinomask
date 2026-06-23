@@ -96,6 +96,10 @@ async function manualProxyPrefs(rp) {
 // "Abrir" → Firefox/Camoufox completo (abas, barra, redimensionamento nativo).
 async function launchManual(profile) {
   if (running.has(profile.id)) return { alreadyRunning: true };
+  // Checa ANTES de tocar no camoufox-js: se o motor não estiver instalado, a lib dispararia
+  // seu próprio download silencioso em background (sem progresso, concorrendo com o nosso
+  // fluxo oficial) — preferimos falhar com uma mensagem clara agora.
+  if (!(await camoufox.isInstalled())) throw new Error('Motor de navegação (Camoufox) não está instalado. Baixe o navegador antes de abrir um perfil.');
   const fpData = await ensureFingerprint(profile);
   // Reaproveita o engine para obter executável + env (CAMOU_CONFIG) + prefs do fingerprint.
   // clamp:false → a janela real do Firefox reflui sozinha e a tela reportada é a do dispositivo virtual do perfil (não vaza o monitor real).
@@ -115,14 +119,29 @@ async function launchManual(profile) {
 
   const target = profile.startUrl || mainWebsiteUrl(profile.mainWebsite) || 'https://www.google.com/';
   const args = ['-profile', profile.userDataDir, '-no-remote', '-new-instance', target];
+  let proc;
   try {
     // detached: o camoufox.exe é um stub que repassa e sai; rastreamos por processo (id do perfil no -profile).
-    const proc = spawn(String(opts.executablePath), args, { env: { ...process.env, ...(opts.env || {}) }, detached: true, stdio: 'ignore' });
-    proc.unref();
+    // stderr é capturado (não 'ignore') para conseguirmos reportar o motivo se o binário crashar.
+    proc = spawn(String(opts.executablePath), args, { env: { ...process.env, ...(opts.env || {}) }, detached: true, stdio: ['ignore', 'ignore', 'pipe'] });
   } catch (e) {
     if (bridge) bridge.close();
     throw e;
   }
+  let stderr = '';
+  proc.stderr.on('data', (d) => { stderr += d; });
+  // Espera curta para confirmar que o processo não morreu de cara (ex.: motor instalado pela
+  // metade/corrompido). Sem isso, "Abrir" reportava sucesso mesmo quando nada abria de fato.
+  const exitCode = await new Promise((resolve) => {
+    const onExit = (code) => resolve(code);
+    proc.once('exit', onExit);
+    setTimeout(() => { proc.removeListener('exit', onExit); resolve(null); }, 1500);
+  });
+  if (exitCode !== null) {
+    if (bridge) bridge.close();
+    throw new Error(`o navegador encerrou imediatamente (código ${exitCode})${stderr ? ': ' + stderr.trim().slice(0, 300) : ' — motor pode estar corrompido, tente baixar de novo'}`);
+  }
+  proc.unref();
   running.set(profile.id, { kind: 'manual', profileId: profile.id, bridge, launchedAt: Date.now() });
   startSweep();
   return { ok: true };
@@ -133,6 +152,9 @@ async function launchAutomation(profile, { headless = true } = {}) {
   if (running.has(profile.id)) {
     return running.get(profile.id).kind === 'pw' ? { alreadyRunning: true } : { ok: false, error: 'perfil aberto manualmente — feche-o primeiro' };
   }
+  // Mesma razão do launchManual: evita o fetch silencioso da lib e dá um erro claro de cara
+  // (isso cobre o "Aquecer" / auditoria / sincronizador, que passam por aqui).
+  if (!(await camoufox.isInstalled())) throw new Error('Motor de navegação (Camoufox) não está instalado. Baixe o navegador antes de aquecer/auditar um perfil.');
   const fpData = await ensureFingerprint(profile);
   // clamp:true → no modo headful de automação (ex.: sincronizador) a janela fixa do Camoufox fica utilizável.
   const launchOpts = await camoufox.buildLaunchOptions(profile, profile.resolvedProxy, fpData, { headless, display: displayInfo, clamp: true });

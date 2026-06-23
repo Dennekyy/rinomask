@@ -241,10 +241,14 @@ const state = {
   selected: new Set(),
   sync: { active: false, masterId: null, slaveIds: [] },
 };
+// Lote de aquecimento em andamento (Fase 3): { rows: Map<profileId, statusElement> }.
+// Alimentado pelo listener rino:event abaixo, lido/escrito por openWarmDialog.
+let activeWarmBatch = null;
 
 const statusById = (id) => state.meta.statuses.find((s) => s.id === id) || { name: '—', color: '#5d6878' };
 const tagById = (id) => state.meta.tags.find((t) => t.id === id);
 const folderById = (id) => state.meta.folders.find((f) => f.id === id);
+const profileById = (id) => state.nonTrash.find((p) => p.id === id) || state.trash.find((p) => p.id === id);
 
 /* ============================== Load / refresh ============================== */
 async function loadMeta() {
@@ -405,7 +409,7 @@ function renderTable() {
       box.append(el('button', { class: 'sm danger', title: 'Excluir definitivamente', onClick: () => confirmDeleteForever([p.id]) }, svg('trash', 14)));
     } else {
       if (p.running) box.append(el('button', { class: 'sm', onClick: async () => { await inv('profiles.stop', { id: p.id }); } }, svg('stop', 13), 'Parar'));
-      else box.append(el('button', { class: 'sm open', onClick: async () => { toast('Abrindo…'); try { await inv('profiles.launch', { id: p.id }); } catch (e) { toast('Erro: ' + e.message); } } }, svg('play', 13), 'Abrir'));
+      else box.append(el('button', { class: 'sm open', onClick: async () => { toast('Abrindo…'); try { const r = await inv('profiles.launch', { id: p.id }); if (r && r.error) toast('Erro: ' + r.error); } catch (e) { toast('Erro: ' + e.message); } } }, svg('play', 13), 'Abrir'));
       box.append(el('button', { class: 'icon', title: 'Mais ações', onClick: (e) => openRowMenu(e, p) }, svg('dots')));
     }
     tr.append(actions);
@@ -434,7 +438,11 @@ function renderBulkBar() {
   bar.style.display = 'flex';
   bar.innerHTML = '';
   bar.append(el('span', { class: 'count' }, `${ids.length} selecionado(s)`));
-  bar.append(el('button', { class: 'sm primary', onClick: async () => { toast('Abrindo perfis…'); await inv('profiles.launchMany', { ids }); } }, svg('play', 13), 'Abrir'));
+  bar.append(el('button', { class: 'sm primary', onClick: async () => {
+    toast('Abrindo perfis…');
+    const r = await inv('profiles.launchMany', { ids });
+    if (r && r.failed && r.failed.length) toast(`Falha ao abrir ${r.failed.length} perfil(is): ${r.failed[0].error}`);
+  } }, svg('play', 13), 'Abrir'));
   bar.append(el('button', { class: 'sm', onClick: async () => { await inv('profiles.stopMany', { ids }); } }, svg('stop', 13), 'Parar'));
 
   bar.append(ddButton('tag', 'Status', state.meta.statuses.map((s) => ({ label: s.name, onClick: async () => { await inv('profiles.setStatus', { ids, status: s.id }); toast('Status alterado'); } }))));
@@ -745,6 +753,21 @@ function openWarmDialog(target) {
   const targetNum = el('input', { type: 'number', value: '70', min: '10', max: '100', style: 'width:74px' });
   const concNum = el('input', { type: 'number', value: '1', min: '1', max: '3', style: 'width:74px' });
   const showWin = el('input', { type: 'checkbox' }); // por padrão OFF → roda em segundo plano
+  // Em lote, o feedback não pode depender só do toast efêmero global (some em 2.6s e várias
+  // contas falhando/concluindo quase juntas se sobrepõem) — cada perfil ganha uma linha de
+  // status que fica visível dentro do próprio diálogo até o lote terminar.
+  let rowsBox = null;
+  if (many) {
+    rowsBox = el('div', { class: 'idbox mono', style: 'max-height:30vh;overflow:auto;margin-top:12px' });
+    activeWarmBatch = { rows: new Map() };
+    ids.forEach((id) => {
+      const prof = profileById(id);
+      const statusEl = el('span', { class: 'hint' }, 'na fila');
+      rowsBox.append(el('div', { style: 'padding:4px 0;display:flex;justify-content:space-between;gap:8px' },
+        el('span', {}, (prof && prof.name) || id), statusEl));
+      activeWarmBatch.rows.set(id, statusEl);
+    });
+  }
   modal({
     title: many ? `Aquecer ${ids.length} perfis` : 'Aquecer perfil',
     body: [
@@ -754,16 +777,22 @@ function openWarmDialog(target) {
       many ? el('label', { style: 'display:flex;gap:8px;align-items:center;margin-top:12px' }, el('span', {}, 'Navegadores em paralelo (1–3):'), concNum) : null,
       el('label', { style: 'display:flex;gap:8px;align-items:center;margin-top:12px' }, showWin, el('span', {}, 'Mostrar a janela do navegador (acompanhar)')),
       el('p', { class: 'hint', style: 'margin-top:12px' }, 'Roda em segundo plano (sem janela) por padrão. Sempre termina dentro do teto de tempo e fecha o navegador ao concluir.'),
-    ],
+      rowsBox,
+    ].filter(Boolean),
     foot: [
-      el('button', { class: 'ghost', onClick: closeModal }, 'Cancelar'),
-      el('button', { class: 'primary', onClick: () => {
+      el('button', { class: 'ghost', onClick: closeModal }, many ? 'Fechar' : 'Cancelar'),
+      el('button', { class: 'primary', onClick: (e) => {
         const targetScore = useTarget.checked ? Math.max(10, Math.min(100, Number(targetNum.value) || 70)) : null;
         const show = showWin.checked;
-        if (many) inv('cookieRobot.runMany', { ids, intensity, targetScore, show, concurrency: Math.max(1, Math.min(3, Number(concNum.value) || 1)) });
-        else inv('cookieRobot.run', { id: ids[0], intensity, targetScore, show });
-        closeModal();
-        toast(show ? '🍪 Aquecimento iniciado…' : '🍪 Aquecendo em segundo plano…');
+        if (many) {
+          inv('cookieRobot.runMany', { ids, intensity, targetScore, show, concurrency: Math.max(1, Math.min(3, Number(concNum.value) || 1)) });
+          e.target.disabled = true; e.target.textContent = 'Aquecendo…';
+          toast('🍪 Aquecendo em segundo plano… acompanhe abaixo');
+        } else {
+          inv('cookieRobot.run', { id: ids[0], intensity, targetScore, show });
+          closeModal();
+          toast(show ? '🍪 Aquecimento iniciado…' : '🍪 Aquecendo em segundo plano…');
+        }
       } }, 'Aquecer'),
     ],
   });
@@ -1108,8 +1137,21 @@ $('#filter-tag').addEventListener('change', (e) => { state.filterTag = e.target.
 $('#check-all').addEventListener('change', (e) => { const list = visibleProfiles(); if (e.target.checked) list.forEach((p) => state.selected.add(p.id)); else list.forEach((p) => state.selected.delete(p.id)); render(); });
 
 window.api.onChanged(async () => { await loadMeta(); await refresh(); });
+function warmRowLabel(e) {
+  if (e.type === 'warm:start') return '🍪 aquecendo…';
+  if (e.type === 'warm:progress') return `aquecendo (${(e.index || 0) + 1}/${e.total || '?'})…`;
+  if (e.type === 'warm:done') return e.error ? ('✗ ' + e.error) : `✓ concluído${typeof e.warmth === 'number' ? ' · ' + e.warmth + '/100' : ''}`;
+  return '';
+}
 window.api.onEvent((e) => {
   if (!e) return;
+  if (activeWarmBatch && e.id && /^warm:/.test(e.type) && activeWarmBatch.rows.has(e.id)) {
+    activeWarmBatch.rows.get(e.id).textContent = warmRowLabel(e);
+    if (e.type === 'warm:done' && [...activeWarmBatch.rows.values()].every((el) => el.textContent.startsWith('✓') || el.textContent.startsWith('✗'))) {
+      toast('🍪 Lote de aquecimento concluído');
+      activeWarmBatch = null;
+    }
+  }
   if (e.type === 'warm:start') toast('🍪 Aquecendo perfil…');
   else if (e.type === 'warm:progress') toast(`Aquecendo (${(e.index || 0) + 1}/${e.total})…`);
   else if (e.type === 'warm:done') { toast(e.error ? ('Aquecimento: ' + e.error) : `✓ Aquecimento concluído${e.visited ? ' — ' + e.visited + ' etapas' : ''}${typeof e.warmth === 'number' ? ' · maturidade ' + e.warmth + '/100' : ''}`); if (!e.error && e.report) openWarmReport(e.report); }

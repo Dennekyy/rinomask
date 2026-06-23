@@ -4,10 +4,19 @@
 // camoufox-js é ESM → carregado via import() dinâmico (este módulo é CJS).
 // Roda sob o ABI do Electron (better-sqlite3 do sampler de WebGL).
 
-let _cf = null, _fp = null, _wg = null;
+let _cf = null, _fp = null, _wg = null, _pk = null;
 async function cf() { if (!_cf) _cf = await import('camoufox-js'); return _cf; }
 async function fpmod() { if (!_fp) _fp = await import('camoufox-js/dist/fingerprints.js'); return _fp; }
 async function wgmod() { if (!_wg) _wg = await import('camoufox-js/dist/webgl/sample.js'); return _wg; }
+async function pkmod() { if (!_pk) _pk = await import('camoufox-js/dist/pkgman.js'); return _pk; }
+
+// Verifica se o motor está instalado SEM disparar o fetch interno e silencioso da lib
+// (pkgman.camoufoxPath() baixa em background se ausente) — checamos antes de chamar
+// qualquer coisa que passe por ali, para nunca depender desse download não supervisionado.
+async function isInstalled() {
+  try { const pk = await pkmod(); pk.launchPath(); return true; } catch (e) { return false; }
+}
+async function installDir() { const pk = await pkmod(); return pk.INSTALL_DIR; }
 
 const SHORT_OS = { windows: 'win', macos: 'mac', linux: 'lin' };
 const randInt = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
@@ -170,4 +179,4 @@ async function buildLaunchOptions(profile, resolvedProxy, fpData, { headless = f
   return out;
 }
 
-module.exports = { buildLaunchOptions, generateProfileFingerprint, mapOs };
+module.exports = { buildLaunchOptions, generateProfileFingerprint, mapOs, isInstalled, installDir };
