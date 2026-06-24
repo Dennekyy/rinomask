@@ -16,7 +16,10 @@ const prebuildInstall = path.join(root, 'node_modules', '.bin', 'prebuild-instal
 const moduleDir = path.join(root, 'node_modules', 'better-sqlite3');
 
 try {
-  execFileSync(prebuildInstall, ['--runtime=electron', `--target=${electronVersion}`, '--arch=x64', '--platform=win32'], { cwd: moduleDir, stdio: 'inherit' });
+  // shell:true e necessario no Windows pra executar um .cmd diretamente via execFileSync
+  // (sem isso, da EINVAL — so funcionava quando chamado via "&" do PowerShell, que tem seu
+  // proprio shell por baixo).
+  execFileSync(prebuildInstall, ['--runtime=electron', `--target=${electronVersion}`, '--arch=x64', '--platform=win32'], { cwd: moduleDir, stdio: 'inherit', shell: true });
   console.log(`[fix-better-sqlite3-abi] better-sqlite3 ajustado para Electron ${electronVersion}.`);
 } catch (e) {
   console.warn('[fix-better-sqlite3-abi] nao foi possivel buscar o prebuilt para Electron — fingerprints podem falhar ao abrir perfis.');

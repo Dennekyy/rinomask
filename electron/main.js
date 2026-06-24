@@ -36,10 +36,37 @@ function emit(type, payload) {
   }
 }
 
-// --- Motor (Camoufox) — baixado no primeiro uso (instalador enxuto) ---
+// --- Motor (Camoufox) — embutido no instalador (scripts/stage-camoufox-engine.js) quando
+// disponível; cai pro download na 1ª execução só se o build for "enxuto" sem staging. ---
 const camoufox = require('../src/engines/camoufox');
 async function isEngineInstalled() { return camoufox.isInstalled(); }
 function engineCliPath() { return require.resolve('camoufox-js/dist/__main__.js'); }
+
+// Copia a cópia embutida em resources/camoufox-engine (extraResources) pro cache real do
+// motor — é cópia local (segundos), não download (minutos), e não depende de rede.
+// Retry: logo após a instalação, o NSIS pode ainda estar liberando o lock de algum arquivo
+// recém-extraído (visto na prática: ENOENT transitório no meio da cópia) — sem retry, isso
+// deixava o cache parcialmente copiado, e isInstalled() podia reportar falso-positivo.
+async function ensureEngineFromBundle() {
+  if (await camoufox.isInstalled()) return true;
+  const fs = require('fs');
+  const bundled = path.join(process.resourcesPath, 'camoufox-engine');
+  if (!fs.existsSync(path.join(bundled, 'version.json'))) return false;
+  const dest = await camoufox.installDir();
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await fs.promises.rm(dest, { recursive: true, force: true }).catch(() => {});
+      await fs.promises.cp(bundled, dest, { recursive: true });
+      if (await camoufox.isInstalled()) return true;
+      throw new Error('cópia concluída mas falhou na verificação de integridade');
+    } catch (e) {
+      errorLog.log({ source: 'engine:bundle', message: `tentativa ${attempt}/3: ${e && e.message}`, stack: e && e.stack });
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
+  await fs.promises.rm(dest, { recursive: true, force: true }).catch(() => {});
+  return false;
+}
 function downloadEngine() {
   return new Promise((resolve) => {
     (async () => {
@@ -261,7 +288,7 @@ const handlers = {
   'sync.status': () => sync.status(),
 
   // --- motor (download na 1ª execução) ---
-  'engine.status': async () => ({ installed: await isEngineInstalled() }),
+  'engine.status': async () => { await ensureEngineFromBundle(); return { installed: await isEngineInstalled() }; },
   'engine.download': () => { downloadEngine(); return { started: true }; },
 
   // --- vault (segurança em repouso) ---

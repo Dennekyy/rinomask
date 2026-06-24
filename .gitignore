@@ -13,6 +13,10 @@ store.json
 build/rcedit-x64.exe
 build/_iconmaker.html
 
+# Motor Camoufox preparado pelo scripts/stage-camoufox-engine.js (~950 MB, nunca versionar —
+# embutido so no instalador final via extraResources)
+build/camoufox-engine/
+
 # Marcador interno e temporários
 .rinomask-branded
 *.tmp
