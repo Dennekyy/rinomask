@@ -130,14 +130,17 @@ async function launchManual(profile) {
   }
   let stderr = '';
   proc.stderr.on('data', (d) => { stderr += d; });
-  // Espera curta para confirmar que o processo não morreu de cara (ex.: motor instalado pela
-  // metade/corrompido). Sem isso, "Abrir" reportava sucesso mesmo quando nada abria de fato.
+  // Espera curta para detectar só um CRASH real (código != 0) logo de cara — ex.: motor
+  // instalado pela metade/corrompido. O camoufox.exe é um stub que entrega o processo real
+  // do navegador e sai DE PROPÓSITO com código 0 em poucos ms (ver comentário acima); tratar
+  // qualquer saída rápida como falha gerava falso positivo mesmo quando o navegador abria
+  // normalmente um instante depois.
   const exitCode = await new Promise((resolve) => {
     const onExit = (code) => resolve(code);
     proc.once('exit', onExit);
     setTimeout(() => { proc.removeListener('exit', onExit); resolve(null); }, 1500);
   });
-  if (exitCode !== null) {
+  if (exitCode !== null && exitCode !== 0) {
     if (bridge) bridge.close();
     throw new Error(`o navegador encerrou imediatamente (código ${exitCode})${stderr ? ': ' + stderr.trim().slice(0, 300) : ' — motor pode estar corrompido, tente baixar de novo'}`);
   }
