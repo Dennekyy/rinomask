@@ -1162,7 +1162,13 @@ window.api.onEvent((e) => {
   else if (e.type === 'engine:done') {
     const ov = $('#engine');
     if (e.ok) { if (ov) ov.style.display = 'none'; boot(); }
-    else if (ov && ov._btn) { ov._btn.disabled = false; ov._btn.textContent = 'Tentar novamente'; if (ov._status) ov._status.textContent = 'Falha no download — verifique a internet.'; }
+    else if (ov && ov._btn) {
+      ov._btn.disabled = false; ov._btn.textContent = 'Tentar novamente';
+      // Mostra a causa tecnica real (rate limit do GitHub, proxy, certificado, etc.) em vez
+      // de um texto generico — sem isso era impossivel diagnosticar por que a internet
+      // "funciona" mas esse download especifico sempre falha.
+      if (ov._status) ov._status.textContent = e.reason ? `Falha no download: ${e.reason}` : 'Falha no download — verifique a internet.';
+    }
   }
 });
 

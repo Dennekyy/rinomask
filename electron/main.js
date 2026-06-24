@@ -48,7 +48,16 @@ function downloadEngine() {
       try { const dir = await camoufox.installDir(); await require('fs').promises.rm(dir, { recursive: true, force: true }); } catch (e) {}
       const { spawn } = require('child_process');
       const child = spawn(process.execPath, [engineCliPath(), 'fetch'], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } });
-      const onData = (d) => emit('engine:progress', { line: String(d).replace(/\s+/g, ' ').trim().slice(0, 140) });
+      // Guarda a ultima linha tecnica real (ex.: "Failed to fetch releases... after 5
+      // attempts", erro de certificado, rate limit do GitHub) — a UI mostrava so um texto
+      // generico "verifique a internet" e descartava a causa de verdade, impossivel de
+      // diagnosticar a distancia.
+      let lastLine = '';
+      const onData = (d) => {
+        const line = String(d).replace(/\s+/g, ' ').trim().slice(0, 200);
+        if (line) lastLine = line;
+        emit('engine:progress', { line: line.slice(0, 140) });
+      };
       child.stdout.on('data', onData);
       child.stderr.on('data', onData);
       child.on('exit', async (code) => {
@@ -56,11 +65,14 @@ function downloadEngine() {
         // por queda de rede no meio) — confirmamos com a mesma checagem usada antes de lançar.
         const ok = code === 0 && (await isEngineInstalled());
         if (ok) await branding.applyBranding((e) => errorLog.log(e)).catch(() => {});
-        else if (code === 0) errorLog.log({ source: 'engine:download', message: 'fetch retornou sucesso mas o motor nao passou na verificacao de integridade' });
-        emit('engine:done', { ok });
+        else {
+          const reason = code === 0 ? 'fetch retornou sucesso mas o motor nao passou na verificacao de integridade' : (lastLine || `processo de download saiu com codigo ${code}`);
+          errorLog.log({ source: 'engine:download', message: reason });
+        }
+        emit('engine:done', { ok, reason: ok ? undefined : lastLine });
         resolve(ok);
       });
-      child.on('error', () => { emit('engine:done', { ok: false }); resolve(false); });
+      child.on('error', (e) => { emit('engine:done', { ok: false, reason: e && e.message }); resolve(false); });
     })();
   });
 }
