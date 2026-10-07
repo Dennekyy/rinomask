@@ -18,7 +18,34 @@
   var XHTML = 'http://www.w3.org/1999/xhtml';
   var EASE = 'cubic-bezier(.16,1,.3,1)';
 
+  // Interface padronizada em QUALQUER sistema do perfil. Perfis macOS/Linux do Camoufox escondem as
+  // fontes do Windows (coerência do fingerprint) — e o Firefox desenha os botões da janela com glifos
+  // da fonte "Segoe Fluent Icons" (content: "\e921"...) e o texto da interface em Segoe UI. Sem elas,
+  // os botões viravam lixo e o texto caía em serifa. Trocamos os glifos por ícones SVG (não dependem
+  // de fonte) e a fonte da interface pela nativa de cada sistema que o perfil ENXERGA:
+  // Segoe UI (win) · Helvetica Neue (mac, embutida no Camoufox) · Arimo (lin, embutida). Só interface.
+  var UI_FONT = '"Segoe UI","Helvetica Neue",Arimo,Arial,sans-serif';
+  var CAPTION = {
+    min: '<path d="M0 5.5h10"/>',
+    max: '<rect x=".5" y=".5" width="9" height="9"/>',
+    restore: '<path d="M2.5 2.5v-2h7v7h-2"/><rect x=".5" y="2.5" width="7" height="7"/>',
+    close: '<path d="M.5.5l9 9M9.5.5l-9 9"/>',
+  };
+  function svgUrl(body, color) {
+    return 'url("data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="none" stroke="' + color + '" stroke-width="1">' + body + '</svg>') + '")';
+  }
+  function captionRules(color, closeHover) {
+    return '.titlebar-min{content:' + svgUrl(CAPTION.min, color) + '!important}' +
+      '.titlebar-max{content:' + svgUrl(CAPTION.max, color) + '!important}' +
+      '.titlebar-restore{content:' + svgUrl(CAPTION.restore, color) + '!important}' +
+      '.titlebar-close{content:' + svgUrl(CAPTION.close, color) + '!important}' +
+      '.titlebar-close:hover{content:' + svgUrl(CAPTION.close, closeHover) + '!important}';
+  }
+
   var SHEET = [
+    ':root,:root *{font-family:' + UI_FONT + '!important}',
+    captionRules('#fbfbfe', '#ffffff'),
+    '@media (prefers-color-scheme:light){' + captionRules('#15141a', '#ffffff') + '}',
     '#rinomask-pill{--rm-c:' + DEFAULT_COLOR + ';-moz-window-dragging:no-drag;appearance:none;align-self:center;flex-shrink:0;',
     'display:inline-flex;align-items:center;gap:7px;max-width:240px;height:24px;margin:0 8px 0 6px;padding:0 11px 0 9px;',
     'border:1px solid color-mix(in oklab,var(--rm-c) 55%,transparent);border-radius:999px;',
@@ -52,7 +79,15 @@
 
   var S;
   try { S = (typeof Services !== 'undefined') ? Services : ChromeUtils.importESModule('resource://gre/modules/Services.sys.mjs').Services; } catch (e) { return; }
-  function report(e) { try { S.console.logStringMessage('[RinoMask pill] ' + e); } catch (x) { /* sem console: ignora */ } }
+  // Erros vão para o console do navegador E para <perfil>/rinomask-pill.log (o console não é acessível
+  // de fora; o arquivo permite diagnosticar a pílula sem abrir as ferramentas do navegador).
+  function report(e) {
+    var msg = '[RinoMask pill] ' + (e && e.stack ? e + ' @ ' + e.stack : e);
+    try { S.console.logStringMessage(msg); } catch (x) { /* sem console: ignora */ }
+    try {
+      IOUtils.writeUTF8(PathUtils.join(PathUtils.profileDir, 'rinomask-pill.log'), new Date().toISOString() + ' ' + msg + '\n', { mode: 'append' }).catch(function () {});
+    } catch (x) { /* sem IOUtils neste escopo: fica s\u00f3 no console */ }
+  }
 
   function readPref(name, fallback) { try { return S.prefs.getStringPref(name, fallback); } catch (e) { return fallback; } }
   function currentColor() { var c = readPref(PREF_COLOR, DEFAULT_COLOR); return HEX.test(c) ? c.toLowerCase() : DEFAULT_COLOR; }
