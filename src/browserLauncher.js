@@ -244,6 +244,6 @@ async function importCookies(profile, cookies) {
 }
 
 module.exports = {
-  launchManual, launchAutomation, stop, stopAll, isRunning, runningIds, kindOf,
+  launchManual, launchAutomation, stop, stopAll, isRunning, runningIds, kindOf, manualPids,
   getContext, getPage, setOnClose, setPersistFingerprint, setDisplay, exportCookies, importCookies,
 };

@@ -16,6 +16,7 @@ const pill = require('../src/pill');
 const updateChecker = require('../src/updateChecker');
 const { REGIONS, PLATFORMS, WINDOWS_FONTS, MAC_FONTS, generateFingerprint, tzOffsetMinutes } = require('../src/fingerprint');
 const { createWarmer } = require('../src/warmer');
+const { createHub } = require('../src/hub/hub');
 
 // Captura erros não tratados do processo principal (init do log acontece no whenReady;
 // até lá vira no-op seguro).
@@ -111,6 +112,9 @@ function downloadEngine() {
 // processo Electron principal (scripts/test-*.js) sem duplicar a lógica real.
 const warmer = createWarmer({ store, launcher, cookieRobot, errorLog, emit, notifyChanged });
 const { ensureLaunched, warmProfile, runManyWarm } = warmer;
+
+// Hub: janela única que organiza os navegadores manuais abertos (src/hub/hub.js).
+const hub = createHub({ launcher, store, errorLog, notifyChanged });
 
 // Auditoria de detecção: abre o perfil, roda a bateria local + os oráculos externos
 // (CreepJS/BrowserScan/Iphey), guarda o relatório e fecha. Visível no app (mais honesto:
@@ -246,6 +250,15 @@ const handlers = {
   // --- cookies (funciona com o perfil fechado: injeta no userDataDir via contexto transitório) ---
   'profiles.exportCookies': (p) => launcher.exportCookies(store.getProfile(p.id)),
   'profiles.importCookies': (p) => launcher.importCookies(store.getProfile(p.id), p.cookies),
+
+  // --- hub de navegadores ---
+  'hub.open': (p) => hub.open(p || {}),
+  'hub.state': () => hub.state(),
+  'hub.priority': (p) => hub.setPriority(p.id),
+  'hub.mode': (p) => hub.setMode(p.mode),
+  'hub.remove': (p) => hub.remove(p.id),
+  'hub.addRunning': () => hub.addRunning(),
+  'hub.scroll': (p) => hub.scroll(p && p.delta),
 
   // --- proxies ---
   'proxies.list': () => store.listProxies(),

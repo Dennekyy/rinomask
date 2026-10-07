@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:" />
+  <title>RinoMask Hub</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="hub.css" />
+</head>
+<body class="hub">
+  <header class="hub-bar">
+    <div class="hub-brand"><span class="logo-mark tb-logo"></span><span>Hub</span><span id="hub-count" class="hub-count">0</span></div>
+    <nav id="hub-pills" class="hub-pills" aria-label="Navegadores no hub"></nav>
+    <div class="hub-actions">
+      <div class="hub-seg" role="group" aria-label="Layout">
+        <button id="mode-grid" type="button" title="Todos do mesmo tamanho (Alt+0 alterna)">Grade</button>
+        <button id="mode-focus" type="button" title="Priorizado grande, demais ao lado (Alt+0 alterna)">Foco</button>
+      </div>
+      <button id="hub-add" class="hub-add" type="button" title="Trazer para o hub todos os perfis abertos, inclusive os removidos">+ Abertos</button>
+    </div>
+  </header>
+  <main id="hub-empty" class="hub-empty">
+    <div>
+      <b>Nenhum navegador no hub</b>
+      <p>Abra perfis no RinoMask — eles entram aqui sozinhos.</p>
+      <p class="hub-keys"><kbd>Alt</kbd>+<kbd>1…9</kbd> prioriza · <kbd>Alt</kbd>+<kbd>0</kbd> grade/foco · maximizar um navegador expande ele no hub</p>
+    </div>
+  </main>
+  <div id="hub-slots" aria-live="polite"></div>
+  <div id="hub-strip" class="hub-strip" hidden>
+    <button id="strip-up" type="button" aria-label="Miniaturas anteriores"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+    <span id="strip-label"></span>
+    <button id="strip-down" type="button" aria-label="Próximas miniaturas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+  </div>
+  <script src="hub-view.js"></script>
+</body>
+</html>

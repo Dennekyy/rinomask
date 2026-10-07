@@ -42,6 +42,7 @@ const ICONS = {
   copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"/>',
   cookie: '<path d="M12 3a9 9 0 1 0 9 9 4 4 0 0 1-4-4 4 4 0 0 1-4-4"/><circle cx="8.5" cy="11" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="15.5" r="1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="9.5" r="1" fill="currentColor" stroke="none"/>',
   restore: '<path d="M3 8a9 9 0 1 1-1.4 5"/><path d="M3 4v4h4"/>',
+  hub: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 8h18"/><path d="M12 8v12"/><path d="M12 14h9"/>',
   link: '<path d="M9 15l6-6"/><path d="M10.5 6.5l1-1a4 4 0 0 1 5.7 5.7l-1 1"/><path d="M13.5 17.5l-1 1a4 4 0 0 1-5.7-5.7l1-1"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   flame: '<path d="M12 3s5 3.5 5 8a5 5 0 0 1-10 0c0-2 1-3.5 2.5-4.5C9 8 10 6 10 4c1 1 2 1.5 2 3"/>',
@@ -443,6 +444,11 @@ function renderBulkBar() {
     const r = await inv('profiles.launchMany', { ids });
     if (r && r.failed && r.failed.length) toast(`Falha ao abrir ${r.failed.length} perfil(is): ${r.failed[0].error}`);
   } }, svg('play', 13), 'Abrir'));
+  bar.append(el('button', { class: 'sm', title: 'Abre os selecionados e reúne todos os navegadores abertos numa janela só', onClick: async () => {
+    toast('Abrindo no hub…');
+    const r = await inv('hub.open', { ids });
+    if (r && r.failed && r.failed.length) toast(`Falha ao abrir ${r.failed.length} perfil(is): ${r.failed[0].error}`);
+  } }, svg('hub', 14), 'Abrir no hub'));
   bar.append(el('button', { class: 'sm', onClick: async () => { await inv('profiles.stopMany', { ids }); } }, svg('stop', 13), 'Parar'));
 
   bar.append(ddButton('tag', 'Status', state.meta.statuses.map((s) => ({ label: s.name, onClick: async () => { await inv('profiles.setStatus', { ids, status: s.id }); toast('Status alterado'); } }))));
@@ -1130,6 +1136,10 @@ async function quickCreate() {
 
 $('#btn-quick').addEventListener('click', quickCreate);
 $('#btn-new').addEventListener('click', () => openEditor(null));
+$('#btn-hub').addEventListener('click', async () => {
+  const r = await inv('hub.open', {});
+  if (r && r.error) toast('Não foi possível abrir o hub: ' + r.error);
+});
 $('#btn-sync').addEventListener('click', () => { const ids = [...state.selected]; if (ids.length < 2) return toast('Selecione 2+ perfis para sincronizar'); startSync(ids); });
 $('#search').addEventListener('input', (e) => { state.search = e.target.value; renderTable(); });
 $('#filter-status').addEventListener('change', (e) => { state.filterStatus = e.target.value; renderTable(); });

@@ -1,0 +1,133 @@
+/* Hub de navegadores — barra de pílulas. Reusa os tokens de style.css. */
+body.hub { --t: 160ms; --ease: cubic-bezier(.16, 1, .3, 1); margin: 0; height: 100vh; overflow: hidden; background: var(--bg); color: var(--fg); display: flex; flex-direction: column; }
+
+.hub-bar {
+  height: 44px; flex-shrink: 0; display: flex; align-items: center; gap: 12px;
+  padding: 0 152px 0 12px;              /* direita: espaço dos controles da janela (overlay) */
+  border-bottom: 1px solid var(--border); -webkit-app-region: drag; user-select: none;
+}
+.hub-brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; flex-shrink: 0; }
+.hub-count { min-width: 18px; padding: 1px 6px; border-radius: 999px; background: var(--surface-3); color: var(--muted); font-size: 11px; text-align: center; }
+
+.hub-pills { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.hub-pills::-webkit-scrollbar { display: none; }
+
+/* Pílula = etiqueta de identidade: fundo tingido pela cor do perfil, borda fina, ponto sólido, nome claro.
+   A priorizada é a única SÓLIDA (cor cheia) → hierarquia sem precisar ler. Mesma linguagem da pílula do navegador. */
+.hub-pill {
+  --c: #2563eb; --on-c: #fff;
+  -webkit-app-region: no-drag; flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px;
+  max-width: 220px; height: 28px; min-height: 0; padding: 0 4px 0 10px;
+  border: 1px solid color-mix(in oklab, var(--c) 50%, transparent); border-radius: 999px;
+  background: color-mix(in oklab, var(--c) 16%, var(--bg));
+  color: color-mix(in oklab, var(--c) 40%, white);
+  font: 600 12px/1 system-ui, "Segoe UI Variable Text", "Segoe UI", sans-serif; letter-spacing: .01em; cursor: pointer;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .05), 0 1px 2px rgb(0 0 0 / .4);
+  transition: background-color var(--t) var(--ease), border-color var(--t) var(--ease), color var(--t) var(--ease),
+    opacity var(--t) var(--ease), transform 120ms var(--ease);
+}
+.hub-pill:hover { background: color-mix(in oklab, var(--c) 26%, var(--bg)); border-color: color-mix(in oklab, var(--c) 85%, transparent); }
+.hub-pill:active { transform: scale(.97); }
+.hub-pill:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.hub-pill .dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.hub-pill .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Fim da pílula: o atalho (Alt+N) em repouso; no hover/foco ele dá lugar ao "tirar do hub". */
+.hub-pill .end { position: relative; flex-shrink: 0; display: inline-grid; place-items: center; width: 20px; height: 20px; }
+.hub-pill .key {
+  display: grid; place-items: center; width: 18px; height: 18px; border-radius: 5px;
+  border: 1px solid color-mix(in oklab, var(--c) 35%, transparent);
+  color: color-mix(in oklab, var(--c) 25%, var(--muted)); font-size: 10px; font-variant-numeric: tabular-nums;
+  transition: opacity var(--t) var(--ease);
+}
+.hub-pill .x {
+  position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%; color: inherit;
+  opacity: 0; transform: scale(.75); transition: opacity var(--t) var(--ease), transform var(--t) var(--ease), background-color var(--t) var(--ease);
+}
+.hub-pill .x svg { width: 12px; height: 12px; }
+.hub-pill:hover .key, .hub-pill:focus-visible .key { opacity: 0; }
+.hub-pill:hover .x, .hub-pill:focus-visible .x { opacity: 1; transform: none; }
+.hub-pill .x:hover { background: color-mix(in oklab, var(--c) 40%, transparent); }
+
+.hub-pill.priority {
+  background: var(--c); border-color: var(--c); color: var(--on-c);
+  box-shadow: 0 1px 2px rgb(0 0 0 / .45), 0 6px 16px -8px var(--c);
+}
+.hub-pill.priority:hover { background: color-mix(in oklab, var(--c) 88%, white); }
+.hub-pill.priority .dot { background: var(--on-c); }
+.hub-pill.priority .key { color: var(--on-c); border-color: color-mix(in oklab, var(--on-c) 40%, transparent); }
+.hub-pill.priority .x:hover { background: color-mix(in oklab, var(--on-c) 22%, transparent); }
+
+/* Fora de cena (excedente/minimizado): contorno tracejado e ponto vazado — existe, mas não está à vista. */
+.hub-pill.hidden { opacity: .7; background: transparent; border-style: dashed; border-color: color-mix(in oklab, var(--c) 80%, transparent); }
+.hub-pill.hidden .dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--c); }
+.hub-pill.hidden:hover { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) { .hub-pill, .hub-pill .x, .hub-pill .key { transition: none; } }
+
+.hub-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; -webkit-app-region: no-drag; }
+.hub-seg { display: inline-flex; padding: 2px; border-radius: var(--r-sm); background: var(--surface-2); border: 1px solid var(--border); }
+.hub-seg button {
+  border: 0; background: transparent; color: var(--muted); font: 500 12px/1 system-ui, sans-serif;
+  padding: 6px 10px; border-radius: 5px; cursor: pointer;
+}
+.hub-seg button:hover { color: var(--fg); }
+.hub-seg button.on { background: var(--accent); color: var(--on-accent); }
+.hub-add {
+  border: 1px solid var(--border-strong); background: transparent; color: var(--fg); font: 500 12px/1 system-ui, sans-serif;
+  padding: 7px 10px; border-radius: var(--r-sm); cursor: pointer;
+}
+.hub-add:hover { background: var(--surface-2); }
+.hub-seg button:focus-visible, .hub-add:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+
+/* Carregando: a pílula já existe (ponto pulsando) e o espaço do navegador fica reservado no layout final
+   — o navegador abre no bastidor e "acende" exatamente aqui, sem nada pular de lugar. */
+.hub-pill.loading { cursor: progress; }
+.hub-pill.loading .dot { animation: hub-pulse 1.2s var(--ease) infinite; }
+@keyframes hub-pulse { 50% { opacity: .25; transform: scale(.7); } }
+
+.hub-slot {
+  position: fixed; display: grid; place-items: center; overflow: hidden; border-radius: 10px;
+  border: 1px solid color-mix(in oklab, var(--c) 30%, var(--border));
+  background: color-mix(in oklab, var(--c) 5%, var(--surface));
+}
+.hub-slot::before {             /* brilho que atravessa o espaço: "algo está chegando aqui" */
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 30%, color-mix(in oklab, var(--c) 10%, transparent) 50%, transparent 70%);
+  transform: translateX(-100%); animation: hub-sweep 1.6s var(--ease) infinite;
+}
+@keyframes hub-sweep { to { transform: translateX(100%); } }
+.hub-slot .slot-body { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 0 16px; text-align: center; }
+.hub-slot .slot-name {
+  display: inline-flex; align-items: center; gap: 8px; max-width: 100%;
+  color: color-mix(in oklab, var(--c) 40%, white); font: 600 14px/1.2 system-ui, "Segoe UI Variable Text", "Segoe UI", sans-serif;
+}
+.hub-slot .slot-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub-slot .slot-name::before { content: ""; flex-shrink: 0; width: 9px; height: 9px; border-radius: 50%; background: var(--c); animation: hub-pulse 1.2s var(--ease) infinite; }
+.hub-slot .slot-note { color: var(--muted); font-size: 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-pill.loading .dot, .hub-slot::before, .hub-slot .slot-name::before { animation: none; }
+}
+
+/* Faixa de scroll no pé da lateral do foco — posicionada pelo processo principal (state.strip, em DIP). */
+.hub-strip {
+  position: fixed; display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: var(--surface); border-top: 1px solid var(--border); color: var(--muted);
+  font: 500 12px/1 system-ui, sans-serif; user-select: none;
+}
+.hub-strip[hidden] { display: none; }
+.hub-strip button {
+  border: 1px solid var(--border-strong); background: transparent; color: var(--fg); cursor: pointer;
+  display: grid; place-items: center; width: 26px; height: 20px; min-height: 0; border-radius: 5px; padding: 0;
+}
+.hub-strip button svg { width: 12px; height: 12px; }
+.hub-strip button:hover:not(:disabled) { background: var(--surface-3); }
+.hub-strip button:disabled { opacity: .35; cursor: default; }
+.hub-strip button:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+
+.hub-empty { flex: 1; display: grid; place-items: center; text-align: center; color: var(--muted); font-size: 13px; }
+.hub-empty b { color: var(--fg); font-size: 15px; }
+.hub-empty[hidden] { display: none; }
+.hub-keys { color: var(--muted-2); }
+.hub-keys kbd { padding: 1px 5px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; font: 11px system-ui, sans-serif; color: var(--muted); }
