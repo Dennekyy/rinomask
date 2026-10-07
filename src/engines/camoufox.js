@@ -160,6 +160,9 @@ async function buildLaunchOptions(profile, resolvedProxy, fpData, { headless = f
       // 1 = concede a geo (spoofada pelo proxy) sem prompt; 2 = bloqueia ('off'). Nunca 0 (o prompt travaria a automação).
       'permissions.default.geo': fp.geolocation && fp.geolocation.mode === 'off' ? 2 : 1,
       'privacy.donottrackheader.enabled': !!fp.doNotTrack,
+      // Nome exibido na pílula do topo da janela (src/pill/pill.cfg.js) — só interface, invisível aos sites.
+      // A COR não vai aqui: o user.js é regravado a cada abertura e resetaria a cor escolhida no navegador.
+      'rinomask.profile.name': String(profile.name || ''),
     },
   };
 

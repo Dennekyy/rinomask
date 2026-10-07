@@ -25,6 +25,7 @@
     "test:cookies": "node scripts/_enode.js scripts/test-cookies.js",
     "test:proxy": "node scripts/_enode.js scripts/test-proxy.js",
     "test:vault": "node scripts/test-vault.js",
+    "test:pill": "node scripts/test-pill.js",
     "test:ui:vault": "node scripts/test-ui-vault.js",
     "test:trust": "node scripts/_enode.js scripts/test-trust.js",
     "test:window": "node scripts/_enode.js scripts/test-window.js",

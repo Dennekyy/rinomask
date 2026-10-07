@@ -12,6 +12,7 @@ const trustScore = require('../src/trustScore');
 const detect = require('../src/detect');
 const errorLog = require('../src/errorLog');
 const branding = require('../src/branding');
+const pill = require('../src/pill');
 const updateChecker = require('../src/updateChecker');
 const { REGIONS, PLATFORMS, WINDOWS_FONTS, MAC_FONTS, generateFingerprint, tzOffsetMinutes } = require('../src/fingerprint');
 const { createWarmer } = require('../src/warmer');
@@ -91,8 +92,10 @@ function downloadEngine() {
         // O exit code 0 da CLI não garante que o binário ficou íntegro (ex.: extração truncada
         // por queda de rede no meio) — confirmamos com a mesma checagem usada antes de lançar.
         const ok = code === 0 && (await isEngineInstalled());
-        if (ok) await branding.applyBranding((e) => errorLog.log(e)).catch(() => {});
-        else {
+        if (ok) {
+          await branding.applyBranding((e) => errorLog.log(e)).catch(() => {});
+          await pill.applyPill((e) => errorLog.log(e)).catch(() => {});
+        } else {
           const reason = code === 0 ? 'fetch retornou sucesso mas o motor nao passou na verificacao de integridade' : (lastLine || `processo de download saiu com codigo ${code}`);
           errorLog.log({ source: 'engine:download', message: reason });
         }
@@ -343,7 +346,12 @@ app.whenReady().then(() => {
     launcher.setDisplay({ width: d.size.width, height: d.size.height, workW: d.workAreaSize.width, workH: d.workAreaSize.height });
   } catch (e) {}
   // Marca o motor como RinoMask (ícone/nome na barra de tarefas) — best-effort, com nada aberto.
-  isEngineInstalled().then((ok) => { if (ok) branding.applyBranding((e) => errorLog.log(e)).catch(() => {}); });
+  // + pílula com o nome do perfil no topo da janela (bloco no camoufox.cfg).
+  isEngineInstalled().then((ok) => {
+    if (!ok) return;
+    branding.applyBranding((e) => errorLog.log(e)).catch(() => {});
+    pill.applyPill((e) => errorLog.log(e)).catch(() => {});
+  });
 
   for (const [channel, fn] of Object.entries(handlers)) {
     ipcMain.handle(channel, async (_e, payload) => {
