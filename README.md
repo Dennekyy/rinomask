@@ -40,6 +40,20 @@ forjados). Workers e iframes ficam coerentes, e como é Firefox não existe o pr
 - **Cookies** — exportar/importar por perfil.
 - **Lixeira** — exclusão reversível; a definitiva apaga toda a memória do perfil.
 - **Sincronizador** — espelha as ações de um perfil mestre nos demais.
+- **Pílula de identidade** — cada navegador mostra no topo uma pílula com o nome do perfil
+  (o mesmo do RinoMask). Botão direito troca a cor; a cor fica salva no próprio perfil. Vive só
+  na interface do navegador — os sites não enxergam.
+- **Hub de navegadores** — reúne todos os navegadores abertos numa janela só, que se reorganiza
+  sozinha conforme a quantidade:
+  - **Grade** (todos iguais) ou **Foco** (o priorizado grande, os demais empilhados ao lado, com
+    scroll quando não cabem); maximizar um navegador o expande no hub inteiro.
+  - Priorizar: clique na pílula da barra do hub, na pílula de dentro do navegador, arraste uma
+    janela sobre outra para trocá-las, ou `Alt+1…9` (`Alt+0` alterna grade/foco).
+  - **Abrir no hub**: espaços reservados aparecem na hora e os navegadores abrem em segundo plano,
+    "acendendo" já no lugar certo. Fechar o hub fecha junto os navegadores que estão nele.
+  - Detalhes técnicos e decisões em [`docs/HUB-E-PILULA.md`](docs/HUB-E-PILULA.md).
+- **Interface padronizada** — perfis macOS/Linux têm os botões da janela e a fonte da interface
+  iguais aos de Windows (sem afetar o fingerprint de fontes do perfil).
 - **Diagnóstico** — log de erros automático em disco, para correções futuras.
 - **Aviso de atualização** — o app compara a própria versão com a publicada aqui no GitHub
   e avisa quando há uma nova.
@@ -47,7 +61,8 @@ forjados). Workers e iframes ficam coerentes, e como é Firefox não existe o pr
 ## Requisitos
 
 - Windows 10/11 (o empacotamento e a marca do navegador são focados em Windows).
-- Node.js 18+ (testado com Node 26) para rodar a partir do código.
+- Node.js 18+ (testado com Node 22 e 24) para rodar a partir do código.
+- O hub usa `koffi` (FFI pré-compilado, sem compilação) para controlar janelas do Windows.
 
 ## Rodando a partir do código
 
@@ -56,8 +71,11 @@ npm install        # Electron + Playwright; baixa o rcedit (marca do navegador)
 npm start          # abre a janela do RinoMask
 ```
 
-Na **primeira execução**, o app baixa o motor Camoufox (~530 MB) — o instalador é enxuto e
-não traz o motor embutido.
+Rodando a partir do código, se o motor Camoufox (~530 MB) ainda não estiver nesta máquina, o app
+oferece baixá-lo. O **instalador já traz o motor embutido** (copiado para o pacote no `npm run dist`).
+
+Ao iniciar, o app prepara o motor de forma idempotente: marca do RinoMask no `camoufox.exe`
+(`src/branding.js`) e o bloco da pílula/interface no `camoufox.cfg` (`src/pill.js`).
 
 ## Gerar o instalador
 
@@ -74,7 +92,11 @@ Tudo em `app.getPath('userData')` do Electron (`%APPDATA%/RinoMask/`):
 
 - `store.json` — perfis, proxies, pastas, status, tags (criptografado quando há vault).
 - `profiles/<id>/userdata/` — memória persistente de cada navegador.
-- `errors.log` — log de diagnóstico.
+- `errors.log` — log de diagnóstico (inclui avisos do hub, ex.: janela que o bastidor não reconheceu).
+- Dentro de `profiles/<id>/userdata/`, além do Firefox:
+  - `user.js` — regravado a cada abertura (proxy, prefs do fingerprint, `rinomask.profile.name`);
+  - `prefs.js` → `rinomask.pill.color` — a cor escolhida na pílula (persiste; nunca vai no `user.js`);
+  - `rinomask-hub.member` / `rinomask-hub.signal` — ponte com o Hub (só um timestamp cada).
 
 Excluir um perfil definitivamente remove a pasta `profiles/<id>` inteira.
 
@@ -87,7 +109,14 @@ npm run test:warm        # aquecedor (pesquisa real, assiste vídeo, mede maturi
 npm run test:manual      # abre o Camoufox real, rastreia e fecha
 npm run test:vault       # criptografia em repouso
 npm run test:trust       # trust score
+npm run test:pill        # injeção da pílula no camoufox.cfg (idempotência, ASCII)
+npm run test:hub-layout  # cálculo do layout do hub (grade, foco, scroll, solo)
+npm run test:hub         # hub de ponta a ponta com navegadores reais (~2 min, abre janelas)
+npm run test:detect      # auditoria de detecção (rodar após mexer em algo que toca o navegador)
 ```
+
+Bateria de comportamento do hub (mede quanto cada janela preenche sua célula em cada modo):
+`npx electron scripts/test-hub-behavior.js [semlimite] [n=6]`.
 
 Os testes que carregam o motor rodam sob o ABI do Electron via `node scripts/_enode.js <script>`.
 
