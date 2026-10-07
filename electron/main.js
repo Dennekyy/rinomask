@@ -354,9 +354,20 @@ app.whenReady().then(() => {
   launcher.setOnClose(() => notifyChanged());
   launcher.setPersistFingerprint((id, data) => store.setFingerprintData(id, data));
   // Informa o tamanho da tela física para a janela do navegador não estourar o monitor.
+  // screen.getPrimaryDisplay() do Electron retorna pixels LÓGICOS (já divididos pela escala
+  // do Windows) — sem multiplicar por scaleFactor, um monitor 1920x1080 a 125% chegava aqui
+  // como 1536x864, o fingerprint de tela do perfil ficava menor que o monitor real, e o
+  // Camoufox media o clique do usuário contra essa tela virtual errada (causa dos cliques nas
+  // abas caindo na faixa de arrastar da janela em telas com escala != 100%).
   try {
     const d = screen.getPrimaryDisplay();
-    launcher.setDisplay({ width: d.size.width, height: d.size.height, workW: d.workAreaSize.width, workH: d.workAreaSize.height });
+    const sf = d.scaleFactor || 1;
+    launcher.setDisplay({
+      width: Math.round(d.size.width * sf),
+      height: Math.round(d.size.height * sf),
+      workW: Math.round(d.workAreaSize.width * sf),
+      workH: Math.round(d.workAreaSize.height * sf),
+    });
   } catch (e) {}
   // Marca o motor como RinoMask (ícone/nome na barra de tarefas) — best-effort, com nada aberto.
   // + pílula com o nome do perfil no topo da janela (bloco no camoufox.cfg).
