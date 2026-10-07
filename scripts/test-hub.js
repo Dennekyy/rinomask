@@ -150,10 +150,40 @@ app.whenReady().then(async () => {
     say('\n[6] fechar o hub fecha quem está dentro');
     const inside2 = hub.state().members.map((m) => m.id);
     hub.remove(inside2[1]);                       // este sai do hub → deve SOBREVIVER ao fechar
+    await sleep(300);
+    const insideHwnd = hub.snapshot().placed.find((p) => p.id === inside2[0]).hwnd;
     hub.close();
+    await sleep(100);
+    check('some JUNTO com o hub (invisível 100ms depois)', !win32.listCamoufoxMainWindows().includes(insideHwnd), 'ainda visível na tela');
     check('navegador dentro do hub fecha junto', await until(() => !launcher.isRunning(inside2[0]), 10000), 'ainda aberto');
     check('navegador tirado do hub continua aberto', launcher.isRunning(inside2[1]));
     check('hub fechado', !hub.isOpen());
+
+    say('\n[7] reabrir no hub perfis que já guardam posição (o caso real do usuário)');
+    const before7 = new Set(win32.listCamoufoxMainWindows());   // inclui o que sobreviveu fora do hub
+    const flashes7 = [];
+    let sampling7 = true;
+    const opening7 = hub.open({ ids });
+    (async () => {
+      while (sampling7) {
+        const a = hub.isOpen() ? hub.snapshot().area : null;
+        for (const h of win32.listCamoufoxMainWindows()) {
+          if (before7.has(h)) continue;
+          const vr = visible(h);
+          if (vr.x <= -10000) continue;
+          const inHub = a && vr.x >= a.x - 12 && vr.y >= a.y - 12 && vr.x + vr.width <= a.x + a.width + 12 && vr.y + vr.height <= a.y + a.height + 12;
+          if (!inHub) flashes7.push({ h, vr });
+        }
+        await sleep(30);
+      }
+    })();
+    await opening7;
+    check('reabertos entram no hub', await until(() => hub.state().members.length === 3 && hub.state().members.every((m) => !m.loading), 40000), JSON.stringify(hub.state().members.map((m) => [m.name, m.loading])));
+    await sleep(1000);
+    sampling7 = false;
+    check('reabertos: nenhum aparece fora do hub (amostra a cada 30ms)', flashes7.length === 0, `${flashes7.length} amostra(s): ` + JSON.stringify(flashes7.slice(0, 3)));
+    hub.close();
+    await sleep(500);
   } catch (e) {
     check('sem exceção', false, e && e.stack);
   } finally {

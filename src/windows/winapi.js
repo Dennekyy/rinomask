@@ -38,6 +38,7 @@ function load() {
     ShowWindow: u.func('bool __stdcall ShowWindow(intptr_t hwnd, int cmd)'),
     SetForegroundWindow: u.func('bool __stdcall SetForegroundWindow(intptr_t hwnd)'),
     GetForegroundWindow: u.func('intptr_t __stdcall GetForegroundWindow()'),
+    RedrawWindow: u.func('bool __stdcall RedrawWindow(intptr_t hwnd, intptr_t rect, intptr_t rgn, uint32_t flags)'),
     BeginDeferWindowPos: u.func('intptr_t __stdcall BeginDeferWindowPos(int n)'),
     DeferWindowPos: u.func('intptr_t __stdcall DeferWindowPos(intptr_t info, intptr_t hwnd, intptr_t after, int x, int y, int cx, int cy, uint32_t flags)'),
     EndDeferWindowPos: u.func('bool __stdcall EndDeferWindowPos(intptr_t info)'),
@@ -129,6 +130,24 @@ function onWindowShown(cb) {
 const OFFSCREEN = -32000;
 function moveOffscreen(hwnd) { load().SetWindowPos(hwnd, 0, OFFSCREEN, OFFSCREEN, 0, 0, SWP.NOSIZE | SWP.NOZORDER | SWP.NOACTIVATE); }
 function isOffscreen(hwnd) { const r = rectOf(hwnd); return !!r && r.x <= OFFSCREEN / 2; }
+// "Cutucão" de repintura: janela que passou pelo bastidor (fora da tela) volta preta — o Firefox
+// pausou a pintura e só retoma com interação. 1px a menos e de volta gera WM_SIZE (repinta tudo) +
+// RedrawWindow invalida a moldura e os filhos.
+const RDW = { INVALIDATE: 0x1, ALLCHILDREN: 0x80, UPDATENOW: 0x100, FRAME: 0x400 };
+function wake(hwnd) {
+  const a = load();
+  const r = rectOf(hwnd);
+  if (!r || a.IsIconic(hwnd)) return;
+  const flags = SWP.NOMOVE | SWP.NOZORDER | SWP.NOACTIVATE;
+  a.SetWindowPos(hwnd, 0, 0, 0, r.width - 1, r.height, flags);
+  a.SetWindowPos(hwnd, 0, 0, 0, r.width, r.height, flags);
+  a.RedrawWindow(hwnd, 0, 0, RDW.INVALIDATE | RDW.ALLCHILDREN | RDW.UPDATENOW | RDW.FRAME);
+}
+
+// Some na hora (sem animação, sem soltar na tela) — usado ao fechar o hub junto com os navegadores.
+const SW_HIDE = 0;
+function hide(hwnd) { load().ShowWindow(hwnd, SW_HIDE); }
+
 function moveTo(hwnd, r) { load().SetWindowPos(hwnd, 0, r.x, r.y, r.width, r.height, SWP.NOZORDER | SWP.NOACTIVATE); }
 function isZoomed(hwnd) { return !!load().IsZoomed(hwnd); }
 function isIconic(hwnd) { return !!load().IsIconic(hwnd); }
@@ -221,6 +240,6 @@ function focus(hwnd) {
 function hwndOf(browserWindow) { return Number(browserWindow.getNativeWindowHandle().readBigInt64LE(0)); }
 
 module.exports = {
-  findBrowserWindows, isAlive, exeOf, isCamoufoxMainWindow, listCamoufoxMainWindows, onWindowShown, moveOffscreen, isOffscreen, moveTo, isZoomed, isIconic, minimize, foreground, leftButtonDown, frameInsets, withInsets,
+  findBrowserWindows, isAlive, exeOf, isCamoufoxMainWindow, listCamoufoxMainWindows, onWindowShown, moveOffscreen, isOffscreen, moveTo, wake, hide, isZoomed, isIconic, minimize, foreground, leftButtonDown, frameInsets, withInsets,
   setOwner, embed, unembed, placeAll, rectOf, drifted, focus, hwndOf, className,
 };

@@ -25,7 +25,9 @@ const COLORS_EVERY = 20;     // a cada N ticks (~4s) relê nome/cor das pílulas
 const SETTLE_MS = 4000;      // logo após entrar, o Firefox se reposiciona sozinho — não é "arrastar"
 const DROP_SIZE_TOL = 12;
 const LAUNCH_CONCURRENCY = 3;     // perfis abrindo em paralelo ao 'Abrir no hub'
-const PENDING_TIMEOUT_MS = 60000; // reservado mas nunca apareceu → libera o espaço    // arrastar move sem mudar o tamanho; mudou o tamanho = não é soltar em outro lugar
+const PENDING_TIMEOUT_MS = 60000; // reservado mas nunca apareceu → libera o espaço
+const WAKE_DELAYS_MS = [120, 900];
+const FAST_SWEEP_MS = 30;           // durante o carregamento: varre novas janelas a cada 30ms (piscar imperceptível)   // repintura após sair do bastidor (a 2ª pega quem ainda estava carregando)    // arrastar move sem mudar o tamanho; mudou o tamanho = não é soltar em outro lugar
 const DEFAULT_COLOR = '#2563eb';
 const COLOR_RE = /user_pref\("rinomask\.pill\.color",\s*"(#[0-9a-fA-F]{6})"\)/;
 
@@ -49,6 +51,8 @@ function createHub({ launcher, store, errorLog, notifyChanged, capToVirtualScree
   const pending = new Map();      // id -> { name, color, since }  carregando: espaço já reservado no layout
   let slots = [];                 // espaços reservados dos pendentes, em DIP relativos à página do hub
   let joinQueued = false;
+  let fastSweep = null;           // timer da varredura rápida (só enquanto há perfis carregando)
+  let known = new Set();          // janelas do Camoufox que já existiam ao abrir no hub (o bastidor não as toca)
   const parked = new Set();       // minimizados pelo usuário → saem do layout até clicar na pílula
   const excluded = new Set();     // removidos do hub pelo usuário → não reentram sozinhos
   let placed = [];                // último layout aplicado [{ id, hwnd, cell, x, y, width, height }] (x..height = janela c/ borda invisível)
@@ -58,6 +62,18 @@ function createHub({ launcher, store, errorLog, notifyChanged, capToVirtualScree
   const alive = () => !!win && !win.isDestroyed();
   const staging = createStaging({ win32, wantsWindows: () => pending.size > 0, onStaged: () => joinSoon(), log });
   function joinSoon() { setTimeout(() => joinRunning(), 0); }
+  const isKnown = (hwnd) => known.has(hwnd) || [...members.values()].some((m) => m.hwnd === hwnd);
+  function startFastSweep() {
+    if (fastSweep) return;
+    fastSweep = setInterval(() => {
+      if (!alive() || pending.size === 0) { clearInterval(fastSweep); fastSweep = null; return; }
+      sweepNow();
+    }, FAST_SWEEP_MS);
+  }
+  function sweepNow() {
+    const caught = staging.sweep(isKnown);
+    if (caught) log(`varredura pegou ${caught} janela(s) que o aviso do Windows não entregou`);
+  }
 
   function readColor(prof) {
     try {
@@ -118,6 +134,12 @@ function createHub({ launcher, store, errorLog, notifyChanged, capToVirtualScree
     try {
       win32.placeAll(placed);
       for (const id of overflow) win32.minimize(members.get(id).hwnd);
+      for (const p of placed) {
+        const m = members.get(p.id);
+        if (!m.wake) continue;
+        m.wake = false;
+        for (const ms of WAKE_DELAYS_MS) setTimeout(() => { try { if (win32.isAlive(p.hwnd)) win32.wake(p.hwnd); } catch (e) { /* janela fechou */ } }, ms);
+      }
     } catch (e) { log('falha ao posicionar janelas: ' + e.message); }
     pushState();
   }
@@ -144,12 +166,13 @@ function createHub({ launcher, store, errorLog, notifyChanged, capToVirtualScree
         const [hwnd] = win32.findBrowserWindows(await launcher.manualPids(id));
         if (!hwnd || !alive()) continue;
         const prof = store.getProfile(id) || {};
+        const fromStaging = staging.has(hwnd);
         staging.claim(hwnd);
         pending.delete(id);
         win32.setOwner(hwnd, hubHwnd);
         const dir = prof.userDataDir;
         signals.markMember(dir);
-        members.set(id, { hwnd, name: prof.name || id, color: readColor(prof), maxSize: screenOf(prof), dir, insets: null, joinedAt: Date.now(), lastSignal: signals.signalTime(dir) });
+        members.set(id, { hwnd, name: prof.name || id, color: readColor(prof), maxSize: screenOf(prof), dir, insets: null, joinedAt: Date.now(), lastSignal: signals.signalTime(dir), wake: fromStaging });
         if (!order.includes(id)) order.push(id);
         added++;
       }
@@ -224,6 +247,7 @@ function createHub({ launcher, store, errorLog, notifyChanged, capToVirtualScree
     for (const [id, m] of members) if (!win32.isAlive(m.hwnd)) { dropMember(id); changed = true; }
     if (!changed && checkSignals()) return;
     staging.tick();
+    if (pending.size > 0) sweepNow();
     for (const [id, p] of pending) {
       if (Date.now() - p.since > PENDING_TIMEOUT_MS) { pending.delete(id); order = order.filter((x) => x !== id); changed = true; log('perfil não apareceu no hub em 60s', { id }); }
     }
@@ -270,6 +294,7 @@ function createHub({ launcher, store, errorLog, notifyChanged, capToVirtualScree
       try { win32.setOwner(m.hwnd, 0); } catch (e) { /* janela já fechada */ }
     }
     members.clear(); parked.clear(); excluded.clear();
+    if (fastSweep) { clearInterval(fastSweep); fastSweep = null; }
     staging.stop();
     pending.clear();
     order = []; placed = []; hidden = []; sideOffset = 0; strip = null; slots = [];
@@ -297,7 +322,12 @@ function createHub({ launcher, store, errorLog, notifyChanged, capToVirtualScree
     let closingIds = [];
     win.on('close', () => {
       closingIds = [...members.keys(), ...[...pending.keys()].filter((id) => launcher.isRunning(id))];
-      for (const m of members.values()) { try { win32.setOwner(m.hwnd, 0); } catch (e) { /* janela já fechada */ } }
+      // Hub e navegadores somem JUNTOS: esconde cada janela no mesmo instante (antes de soltar o dono,
+      // senão ela aparece solta na tela) e só depois encerra os processos, em segundo plano.
+      for (const m of members.values()) {
+        try { win32.hide(m.hwnd); win32.setOwner(m.hwnd, 0); } catch (e) { /* janela já fechada */ }
+      }
+      staging.hideAll();
     });
     win.on('closed', () => {
       release();
@@ -324,13 +354,14 @@ function createHub({ launcher, store, errorLog, notifyChanged, capToVirtualScree
       if (!order.includes(id)) order.push(id);
       toLaunch.push(prof);
     }
-    if (toLaunch.length) { staging.start(); relayout(); }   // espaços reservados aparecem na hora
+    known = new Set(win32.listCamoufoxMainWindows());
+    if (toLaunch.length) { staging.start(); startFastSweep(); relayout(); }   // espaços reservados aparecem na hora
     joinRunning();                                           // quem já estava aberto entra agora
     // Abre em paralelo (LAUNCH_CONCURRENCY por vez); cada janela nasce no bastidor e vai para o seu espaço.
     const queue = [...toLaunch];
     async function worker() {
       for (let prof = queue.shift(); prof; prof = queue.shift()) {
-        try { await launcher.launchManual(prof); store.markLaunched(prof.id); notifyChanged(); }
+        try { await launcher.launchManual(prof); store.markLaunched(prof.id); notifyChanged(); sweepNow(); }
         catch (e) {
           failed.push({ id: prof.id, error: e.message });
           pending.delete(prof.id);

@@ -12,11 +12,29 @@ function createStaging({ win32, wantsWindows, onStaged, log }) {
   const staged = new Map();   // hwnd -> { since, rect }  (rect = onde a janela apareceu, para devolver)
   let unhook = null;
 
-  function onShown(hwnd) {
-    if (staged.has(hwnd) || !wantsWindows() || !win32.isCamoufoxMainWindow(hwnd)) return;
+  function stage(hwnd) {
     staged.set(hwnd, { since: Date.now(), rect: win32.rectOf(hwnd) });
     win32.moveOffscreen(hwnd);
     onStaged(hwnd);
+  }
+
+  function onShown(hwnd) {
+    if (staged.has(hwnd) || !wantsWindows() || !win32.isCamoufoxMainWindow(hwnd)) return;
+    stage(hwnd);
+  }
+
+  // Rede de segurança do aviso do Windows: varre as janelas do Camoufox visíveis na tela e manda para
+  // o bastidor as que não são conhecidas (membros / já abertas antes). Devolve quantas pegou.
+  // (Na prática o aviso às vezes não chega para a 1ª janela de perfis que já guardam posição.)
+  function sweep(isKnown) {
+    if (!wantsWindows()) return 0;
+    let caught = 0;
+    for (const hwnd of win32.listCamoufoxMainWindows()) {
+      if (staged.has(hwnd) || isKnown(hwnd) || win32.isOffscreen(hwnd)) continue;
+      stage(hwnd);
+      caught++;
+    }
+    return caught;
   }
 
   function start() {
@@ -37,6 +55,12 @@ function createStaging({ win32, wantsWindows, onStaged, log }) {
     for (const hwnd of [...staged.keys()]) release(hwnd);
   }
 
+  // Hub fechando: quem está no bastidor vai ser encerrado → esconde em vez de devolver à tela.
+  function hideAll() {
+    for (const hwnd of staged.keys()) { try { win32.hide(hwnd); } catch (e) { /* janela já fechou */ } }
+    staged.clear();
+  }
+
   // A cada tick: esquece as fechadas, devolve as vencidas e mantém as demais fora da tela
   // (o Firefox às vezes se reposiciona sozinho logo depois de abrir).
   function tick() {
@@ -48,7 +72,7 @@ function createStaging({ win32, wantsWindows, onStaged, log }) {
   }
 
   return {
-    start, stop, tick, release,
+    start, stop, tick, release, sweep, hideAll,
     claim: (hwnd) => staged.delete(hwnd),   // o hub encaixou: não é mais responsabilidade do bastidor
     has: (hwnd) => staged.has(hwnd),
     size: () => staged.size,
