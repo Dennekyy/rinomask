@@ -109,7 +109,7 @@ function api(method, host, p, headers, body) {
 
   step('Publicando a release no GitHub e anexando o instalador (com retry p/ rede instável)');
   const rb = JSON.stringify({ tag_name: tag, name: 'RinoMask ' + newV, draft: false, prerelease: false,
-    body: `Release ${newV}.\n\nBaixe o RinoMask-Setup-${newV}.exe e execute. Não é assinado (SmartScreen: Mais informações -> Executar assim mesmo). Na 1ª abertura o app baixa o motor Camoufox (~530 MB).` });
+    body: `Release ${newV}.\n\nBaixe o RinoMask-Setup-${newV}.exe e execute. Não é assinado (SmartScreen: Mais informações -> Executar assim mesmo). O instalador já traz o motor Camoufox embutido.${process.env.RELEASE_NOTES ? '\n\n' + process.env.RELEASE_NOTES : ''}` });
   const rel = await retry(async () => {
     const cr = await api('POST', 'api.github.com', `/repos/${OWNER}/${REPO}/releases`, { Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(rb) }, rb);
     const j = JSON.parse(cr.body.toString());
